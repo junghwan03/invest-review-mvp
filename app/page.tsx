@@ -154,6 +154,36 @@ async function copyText(text: string) {
   document.body.removeChild(ta);
 }
 
+// ====== ✅ 무료 사용 제한(하루 2회) ======
+const DAILY_LIMIT = 2;
+const DAILY_LIMIT_KEY = "daily_ai_limit_v1";
+
+type DailyUsage = { date: string; count: number };
+
+function todayKeyISO() {
+  // YYYY-MM-DD (항상 동일 포맷)
+  return new Date().toISOString().slice(0, 10);
+}
+
+function readDailyUsage(): DailyUsage {
+  const today = todayKeyISO();
+  const raw = localStorage.getItem(DAILY_LIMIT_KEY);
+  if (!raw) return { date: today, count: 0 };
+
+  try {
+    const parsed = JSON.parse(raw) as DailyUsage;
+    if (!parsed?.date || typeof parsed.count !== "number") return { date: today, count: 0 };
+    if (parsed.date !== today) return { date: today, count: 0 };
+    return parsed;
+  } catch {
+    return { date: today, count: 0 };
+  }
+}
+
+function writeDailyUsage(next: DailyUsage) {
+  localStorage.setItem(DAILY_LIMIT_KEY, JSON.stringify(next));
+}
+
 export default function Page() {
   const [tradeType, setTradeType] = useState<TradeType>("long");
 
@@ -167,6 +197,12 @@ export default function Page() {
 
   // ✅ 히스토리 state
   const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  // ✅ 오늘 사용량 표시용
+  const [dailyCount, setDailyCount] = useState(0);
+
+  // ✅ 더블클릭/연타 방지 (렌더 전에 또 눌러도 막기)
+  const inFlightRef = useRef(false);
 
   // ✅ 최초 1회: localStorage 로드
   useEffect(() => {
@@ -183,6 +219,11 @@ export default function Page() {
     if (typeof window !== "undefined") {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
     }
+
+    // ✅ 오늘 사용량 초기화
+    const usage = readDailyUsage();
+    writeDailyUsage(usage); // 날짜 바뀐 경우 자동 0으로 저장
+    setDailyCount(usage.count);
   }, []);
 
   function persistHistory(next: HistoryItem[]) {
@@ -193,16 +234,25 @@ export default function Page() {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
   }
 
+  // ✅✅✅ FIX: stale state로 중복 저장되는 문제 해결 (함수형 업데이트)
   function saveToHistory(payload: Omit<HistoryItem, "id" | "createdAt">) {
     const item: HistoryItem = {
       id:
         // @ts-ignore
         crypto?.randomUUID?.() ??
-        String(Date.now()) + Math.random().toString(16).slice(2),
+        `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       createdAt: Date.now(),
       ...payload,
     };
-    persistHistory([item, ...history]);
+
+    setHistory((prev) => {
+      const next = [item, ...prev]
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, FREE_HISTORY_LIMIT);
+
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+      return next;
+    });
   }
 
   function removeHistory(id: string) {
@@ -215,7 +265,6 @@ export default function Page() {
 
   // ✅ 내보내기(복사)
   async function exportHistoryItem(h: HistoryItem) {
-    // ✅ GA 이벤트: 내보내기
     gaEvent(GA_EVENT.EXPORT_HISTORY, { tradeType: h.tradeType, ticker: h.ticker });
 
     const text = buildExportText(h);
@@ -239,7 +288,6 @@ export default function Page() {
   }
 
   function loadHistoryItem(h: HistoryItem) {
-    // ✅ GA 이벤트: 불러오기
     gaEvent(GA_EVENT.LOAD_HISTORY, { tradeType: h.tradeType, ticker: h.ticker });
 
     setTradeType(h.tradeType);
@@ -262,36 +310,12 @@ export default function Page() {
   const cacheRef = useRef<
     Record<
       TradeType,
-      {
-        ticker: string;
-        entryPrice: number;
-        stopLoss: number | "";
-        reasonNote: string;
-        result: string;
-      }
+      { ticker: string; entryPrice: number; stopLoss: number | ""; reasonNote: string; result: string }
     >
   >({
-    long: {
-      ticker: "AAPL",
-      entryPrice: 100,
-      stopLoss: "",
-      reasonNote: "",
-      result: "",
-    },
-    swing: {
-      ticker: "AAPL",
-      entryPrice: 100,
-      stopLoss: "",
-      reasonNote: "",
-      result: "",
-    },
-    day: {
-      ticker: "AAPL",
-      entryPrice: 100,
-      stopLoss: "",
-      reasonNote: "",
-      result: "",
-    },
+    long: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
+    swing: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
+    day: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
   });
 
   // ✅ 탭 변경 시: 이전 탭 저장 → 새 탭 복원
@@ -315,7 +339,25 @@ export default function Page() {
   const title = useMemo(() => `AI 투자 복기 리포트 (MVP)`, []);
 
   async function onGenerate() {
-    // ✅ GA 이벤트: 리포트 생성
+    // ✅✅✅ FIX: 렌더 전 연타도 막으려면 "즉시" lock 걸어야 함
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+
+    // ✅ 무료 하루 2회 제한 체크 (항상 같은 기준: localStorage)
+    const usage = readDailyUsage();
+
+    if (usage.count >= DAILY_LIMIT) {
+      gaEvent(GA_EVENT.DAILY_LIMIT_BLOCKED, { tradeType, ticker, limit: DAILY_LIMIT });
+      alert("무료 버전은 하루에 2회까지만 AI 복기 리포트를 생성할 수 있어요 🙏");
+      inFlightRef.current = false; // ✅ lock 해제
+      return;
+    }
+
+    // ✅ 요청 전에 사용횟수 +1 저장 (동시에 UI도 업데이트)
+    const nextUsage: DailyUsage = { date: usage.date, count: usage.count + 1 };
+    writeDailyUsage(nextUsage);
+    setDailyCount(nextUsage.count);
+
     gaEvent(GA_EVENT.GENERATE_REPORT, { tradeType, ticker });
 
     setLoading(true);
@@ -337,14 +379,22 @@ export default function Page() {
       const data = await res.json();
 
       if (!res.ok) {
+        // ✅ 실패 시 롤백
+        const rollback: DailyUsage = {
+          date: nextUsage.date,
+          count: Math.max(0, nextUsage.count - 1),
+        };
+        writeDailyUsage(rollback);
+        setDailyCount(rollback.count);
+
         setResult(`서버 에러 (${res.status}): ${data?.text ?? JSON.stringify(data)}`);
+        gaEvent(GA_EVENT.GENERATE_FAIL, { tradeType, ticker, status: res.status });
         return;
       }
 
       const text = data?.text ?? "응답에 text가 없습니다.";
       setResult(text);
 
-      // ✅ 생성 성공 시 히스토리에 저장 (최대 10개)
       saveToHistory({
         tradeType,
         ticker,
@@ -353,10 +403,22 @@ export default function Page() {
         reasonNote,
         result: text,
       });
+
+      gaEvent(GA_EVENT.GENERATE_SUCCESS, { tradeType, ticker });
     } catch (err: any) {
+      // ✅ 실패 시 롤백
+      const rollback: DailyUsage = {
+        date: nextUsage.date,
+        count: Math.max(0, nextUsage.count - 1),
+      };
+      writeDailyUsage(rollback);
+      setDailyCount(rollback.count);
+
       setResult(`네트워크/실행 오류: ${String(err?.message ?? err)}`);
+      gaEvent(GA_EVENT.GENERATE_FAIL, { tradeType, ticker, error: String(err?.message ?? err) });
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   }
 
@@ -381,7 +443,6 @@ export default function Page() {
   function onPrintPdfResultOnly() {
     if (!result) return;
 
-    // ✅ GA 이벤트: PDF 저장
     gaEvent(GA_EVENT.DOWNLOAD_PDF, { tradeType, ticker });
 
     const label = TAB_LABEL[tradeType];
@@ -478,9 +539,14 @@ export default function Page() {
       <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 6 }}>{title}</h1>
 
       <p style={{ color: "#6b7280", marginTop: 0 }}>
-        장기/스윙/단타 탭으로 분리해서 기록합니다. (무료: 최근 {FREE_HISTORY_LIMIT}개
-        오프라인 저장)
+        장기/스윙/단타 탭으로 분리해서 기록합니다. (무료: 최근 {FREE_HISTORY_LIMIT}개 오프라인 저장)
       </p>
+
+      {/* ✅ 오늘 무료 사용량 */}
+      <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 10 }}>
+        오늘 무료 사용: {dailyCount} / {DAILY_LIMIT} (남은 횟수:{" "}
+        {Math.max(0, DAILY_LIMIT - dailyCount)})
+      </div>
 
       {/* 탭 */}
       <div style={{ display: "flex", gap: 10, margin: "14px 0 18px" }}>
@@ -568,7 +634,7 @@ export default function Page() {
             />
           </label>
 
-          {/* ✅ 가이드/예시 카드 */}
+          {/* 가이드/예시 카드 */}
           <div
             style={{
               display: "grid",
@@ -601,7 +667,7 @@ export default function Page() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
               onClick={onGenerate}
-              disabled={loading}
+              disabled={loading || inFlightRef.current}
               style={{
                 flex: 1,
                 minWidth: 260,
@@ -678,7 +744,7 @@ export default function Page() {
         </section>
       )}
 
-      {/* ✅ 최근 저장된 복기 */}
+      {/* 최근 저장된 복기 */}
       <section
         style={{
           marginTop: 18,
@@ -712,7 +778,9 @@ export default function Page() {
         </div>
 
         {history.length === 0 ? (
-          <p style={{ color: "#6b7280", marginTop: 10 }}>아직 저장된 복기가 없습니다. 리포트를 생성하면 자동으로 저장돼요.</p>
+          <p style={{ color: "#6b7280", marginTop: 10 }}>
+            아직 저장된 복기가 없습니다. 리포트를 생성하면 자동으로 저장돼요.
+          </p>
         ) : (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
             {history.map((h) => (
