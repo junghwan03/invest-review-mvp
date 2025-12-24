@@ -194,7 +194,9 @@ function writeDailyUsage(next: DailyUsage) {
 export default function Page() {
   const [tradeType, setTradeType] = useState<TradeType>("long");
 
-  const [ticker, setTicker] = useState("AAPL");
+  // ✅ 변경: 웹 열자마자 AAPL 뜨는 것 제거 (placeholder만 보이게)
+  const [ticker, setTicker] = useState("");
+
   const [entryPrice, setEntryPrice] = useState<number>(100);
   const [stopLoss, setStopLoss] = useState<number | "">("");
   const [reasonNote, setReasonNote] = useState<string>("");
@@ -307,9 +309,10 @@ export default function Page() {
       { ticker: string; entryPrice: number; stopLoss: number | ""; reasonNote: string; result: string }
     >
   >({
-    long: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
-    swing: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
-    day: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
+    // ✅ 변경: 기본 ticker를 빈 문자열로
+    long: { ticker: "", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
+    swing: { ticker: "", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
+    day: { ticker: "", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
   });
 
   // ✅ 탭 변경 시: 이전 탭 저장 → 새 탭 복원
@@ -333,12 +336,20 @@ export default function Page() {
   const title = useMemo(() => `AI 투자 복기 리포트 (MVP)`, []);
 
   async function onGenerate() {
+    // ✅ 필수 입력 검증
+    if (!ticker.trim()) {
+      alert("종목/티커/코인명을 입력해줘!");
+      return;
+    }
+    if (!Number.isFinite(entryPrice) || entryPrice <= 0) {
+      alert("진입가(필수)를 올바르게 입력해줘! (0보다 큰 숫자)");
+      return;
+    }
+
     // ✅ 하루 2회 제한 (localStorage 기준)
     const usage = readDailyUsage();
     if (usage.count >= DAILY_LIMIT) {
       alert("무료 버전은 하루에 2회까지만 AI 복기 리포트를 생성할 수 있어요 🙏");
-      // (선택) 막힘 이벤트를 GA에 남기고 싶으면 아래처럼 따로 event name 줘도 됨
-      // gaEvent("daily_limit_blocked", { tradeType, ticker });
       return;
     }
 
@@ -391,7 +402,8 @@ export default function Page() {
 
   function onClearAll() {
     const base = {
-      ticker: "AAPL",
+      // ✅ 변경: 리셋 시에도 ticker 비워두기
+      ticker: "",
       entryPrice: 100,
       stopLoss: "" as const,
       reasonNote: "",
@@ -547,11 +559,13 @@ export default function Page() {
           </label>
 
           <label style={{ fontWeight: 800 }}>
-            진입가
+            진입가{" "}
+            <span style={{ fontWeight: 700, color: "#ef4444" }}>(필수)</span>
             <input
               type="number"
               value={entryPrice}
               onChange={(e) => setEntryPrice(Number(e.target.value))}
+              placeholder="예: 100.5"
               style={{
                 width: "100%",
                 padding: 12,
