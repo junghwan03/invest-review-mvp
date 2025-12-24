@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from "react";
+import { gaEvent, GA_EVENT } from "@/lib/ga";
 
 type TradeType = "long" | "swing" | "day";
 
@@ -214,6 +215,9 @@ export default function Page() {
 
   // ✅ 내보내기(복사)
   async function exportHistoryItem(h: HistoryItem) {
+    // ✅ GA 이벤트: 내보내기
+    gaEvent(GA_EVENT.EXPORT_HISTORY, { tradeType: h.tradeType, ticker: h.ticker });
+
     const text = buildExportText(h);
 
     try {
@@ -235,6 +239,9 @@ export default function Page() {
   }
 
   function loadHistoryItem(h: HistoryItem) {
+    // ✅ GA 이벤트: 불러오기
+    gaEvent(GA_EVENT.LOAD_HISTORY, { tradeType: h.tradeType, ticker: h.ticker });
+
     setTradeType(h.tradeType);
     setTicker(h.ticker);
     setEntryPrice(h.entryPrice);
@@ -308,6 +315,9 @@ export default function Page() {
   const title = useMemo(() => `AI 투자 복기 리포트 (MVP)`, []);
 
   async function onGenerate() {
+    // ✅ GA 이벤트: 리포트 생성
+    gaEvent(GA_EVENT.GENERATE_REPORT, { tradeType, ticker });
+
     setLoading(true);
     setResult("AI가 리포트를 작성 중입니다...");
 
@@ -370,6 +380,9 @@ export default function Page() {
 
   function onPrintPdfResultOnly() {
     if (!result) return;
+
+    // ✅ GA 이벤트: PDF 저장
+    gaEvent(GA_EVENT.DOWNLOAD_PDF, { tradeType, ticker });
 
     const label = TAB_LABEL[tradeType];
     const docTitle = `AI 투자 복기 리포트 - ${label} - ${ticker}`;
@@ -519,15 +532,11 @@ export default function Page() {
 
           <label style={{ fontWeight: 800 }}>
             손절가{" "}
-            <span style={{ fontWeight: 600, color: "#6b7280" }}>
-              (선택 · 필수 아님)
-            </span>
+            <span style={{ fontWeight: 600, color: "#6b7280" }}>(선택 · 필수 아님)</span>
             <input
               type="number"
               value={stopLoss}
-              onChange={(e) =>
-                setStopLoss(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              onChange={(e) => setStopLoss(e.target.value === "" ? "" : Number(e.target.value))}
               placeholder="예: 92.5 (손절 기준이 없다면 비워두세요)"
               style={{
                 width: "100%",
@@ -571,14 +580,10 @@ export default function Page() {
               background: "#fafafa",
             }}
           >
-            <div style={{ fontWeight: 900, color: "#111827" }}>
-              {TAB_LABEL[tradeType]} 작성 가이드 & 예시
-            </div>
+            <div style={{ fontWeight: 900, color: "#111827" }}>{TAB_LABEL[tradeType]} 작성 가이드 & 예시</div>
 
             <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.6 }}>
-              <div style={{ fontWeight: 900, marginBottom: 6 }}>
-                ✅ 꼭 포함하면 좋은 항목
-              </div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>✅ 꼭 포함하면 좋은 항목</div>
               <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
                 {NOTE_TEMPLATES[tradeType]}
               </pre>
@@ -663,8 +668,7 @@ export default function Page() {
               whiteSpace: "pre-wrap",
               marginTop: 10,
               lineHeight: 1.6,
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               fontSize: 13,
               color: "#111827",
             }}
@@ -684,14 +688,7 @@ export default function Page() {
           background: "white",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>
             최근 저장된 복기 (최대 {FREE_HISTORY_LIMIT}개)
           </h2>
@@ -715,9 +712,7 @@ export default function Page() {
         </div>
 
         {history.length === 0 ? (
-          <p style={{ color: "#6b7280", marginTop: 10 }}>
-            아직 저장된 복기가 없습니다. 리포트를 생성하면 자동으로 저장돼요.
-          </p>
+          <p style={{ color: "#6b7280", marginTop: 10 }}>아직 저장된 복기가 없습니다. 리포트를 생성하면 자동으로 저장돼요.</p>
         ) : (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
             {history.map((h) => (
@@ -732,14 +727,7 @@ export default function Page() {
                   gap: 6,
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    alignItems: "center",
-                  }}
-                >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
                   <div style={{ fontWeight: 900, color: "#111827" }}>
                     [{TAB_LABEL[h.tradeType]}] {h.ticker} / Entry {h.entryPrice}
                     {h.stopLoss != null ? ` / SL ${h.stopLoss}` : " / SL N/A"}
@@ -761,7 +749,6 @@ export default function Page() {
                       불러오기
                     </button>
 
-                    {/* ✅ 추가: 내보내기(복사) */}
                     <button
                       onClick={() => exportHistoryItem(h)}
                       style={{
@@ -794,9 +781,7 @@ export default function Page() {
                   </div>
                 </div>
 
-                <div style={{ color: "#6b7280", fontSize: 12 }}>
-                  {formatDateTime(h.createdAt)}
-                </div>
+                <div style={{ color: "#6b7280", fontSize: 12 }}>{formatDateTime(h.createdAt)}</div>
 
                 <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.5 }}>
                   <div style={{ fontWeight: 900, marginBottom: 4 }}>메모 요약</div>
@@ -813,8 +798,7 @@ export default function Page() {
         )}
 
         <p style={{ color: "#6b7280", fontSize: 12, marginTop: 12 }}>
-          * 무료 버전은 기기(브라우저) 내부 저장(localStorage)이라, 브라우저 데이터
-          삭제/기기 변경 시 기록이 사라질 수 있어요.
+          * 무료 버전은 기기(브라우저) 내부 저장(localStorage)이라, 브라우저 데이터 삭제/기기 변경 시 기록이 사라질 수 있어요.
         </p>
       </section>
     </main>
