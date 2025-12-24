@@ -158,6 +158,39 @@ async function copyText(text: string) {
   document.body.removeChild(ta);
 }
 
+// ====== ✅ 무료 사용 제한(하루 2회) ======
+const DAILY_LIMIT = 2;
+const DAILY_LIMIT_KEY = "daily_ai_limit_v1";
+type DailyUsage = { date: string; count: number };
+
+function todayKeyLocal() {
+  // 로컬 기준 YYYY-MM-DD (KST에서도 안전)
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function readDailyUsage(): DailyUsage {
+  const today = todayKeyLocal();
+  const raw = localStorage.getItem(DAILY_LIMIT_KEY);
+  if (!raw) return { date: today, count: 0 };
+
+  try {
+    const parsed = JSON.parse(raw) as DailyUsage;
+    if (!parsed?.date || typeof parsed.count !== "number") return { date: today, count: 0 };
+    if (parsed.date !== today) return { date: today, count: 0 };
+    return parsed;
+  } catch {
+    return { date: today, count: 0 };
+  }
+}
+
+function writeDailyUsage(next: DailyUsage) {
+  localStorage.setItem(DAILY_LIMIT_KEY, JSON.stringify(next));
+}
+
 export default function Page() {
   const [tradeType, setTradeType] = useState<TradeType>("long");
 
@@ -171,6 +204,9 @@ export default function Page() {
 
   // ✅ 히스토리 state
   const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  // ✅ 오늘 사용량 표시용
+  const [dailyCount, setDailyCount] = useState(0);
 
   // ✅ 최초 1회: localStorage 로드
   useEffect(() => {
@@ -187,6 +223,11 @@ export default function Page() {
     if (typeof window !== "undefined") {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
     }
+
+    // ✅ 오늘 사용량 초기화/표시 (날짜 바뀌면 자동 0)
+    const usage = readDailyUsage();
+    writeDailyUsage(usage);
+    setDailyCount(usage.count);
   }, []);
 
   function persistHistory(next: HistoryItem[]) {
@@ -229,7 +270,9 @@ export default function Page() {
       const w = window.open("", "_blank", "noopener,noreferrer");
       if (w) {
         w.document.write(
-          `<pre style="white-space:pre-wrap;font-family:system-ui;padding:16px">${escapeHtml(text)}</pre>`
+          `<pre style="white-space:pre-wrap;font-family:system-ui;padding:16px">${escapeHtml(
+            text
+          )}</pre>`
         );
         w.document.close();
       } else {
@@ -290,6 +333,15 @@ export default function Page() {
   const title = useMemo(() => `AI 투자 복기 리포트 (MVP)`, []);
 
   async function onGenerate() {
+    // ✅ 하루 2회 제한 (localStorage 기준)
+    const usage = readDailyUsage();
+    if (usage.count >= DAILY_LIMIT) {
+      alert("무료 버전은 하루에 2회까지만 AI 복기 리포트를 생성할 수 있어요 🙏");
+      // (선택) 막힘 이벤트를 GA에 남기고 싶으면 아래처럼 따로 event name 줘도 됨
+      // gaEvent("daily_limit_blocked", { tradeType, ticker });
+      return;
+    }
+
     gaEvent(GA_EVENT.GENERATE_REPORT, { tradeType, ticker });
 
     setLoading(true);
@@ -314,6 +366,10 @@ export default function Page() {
         setResult(`서버 에러 (${res.status}): ${data?.text ?? JSON.stringify(data)}`);
         return;
       }
+
+      // ✅ 성공했을 때만 카운트 +1
+      writeDailyUsage({ date: usage.date, count: usage.count + 1 });
+      setDailyCount(usage.count + 1);
 
       const text = data?.text ?? "응답에 text가 없습니다.";
       setResult(text);
@@ -452,6 +508,11 @@ export default function Page() {
       <p style={{ color: "#6b7280", marginTop: 0 }}>
         장기/스윙/단타 탭으로 분리해서 기록합니다. (무료: 최근 {FREE_HISTORY_LIMIT}개 오프라인 저장)
       </p>
+
+      {/* ✅ 오늘 무료 사용량 */}
+      <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 10 }}>
+        오늘 무료 사용: {dailyCount} / {DAILY_LIMIT} (남은 횟수: {Math.max(0, DAILY_LIMIT - dailyCount)})
+      </div>
 
       {/* 탭 */}
       <div style={{ display: "flex", gap: 10, margin: "14px 0 18px" }}>
