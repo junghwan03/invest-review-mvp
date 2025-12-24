@@ -62,8 +62,12 @@ const EXAMPLE_NOTES: Record<TradeType, string> = {
 - 체크: 수수료/슬리피지 포함 손익 확인`,
 };
 
+// ✅✅✅ FIX: 한글/영문/숫자/공백/.-_ 허용 (종목명/티커/코인명 검색어로 사용)
 function clampTicker(v: string) {
-  return v.toUpperCase().replace(/[^A-Z0-9.\-]/g, "").slice(0, 12);
+  return v
+    .replace(/[^\p{L}\p{N}\s.\-_]/gu, "") // 모든 언어 글자/숫자 + 공백 + . - _
+    .trim()
+    .slice(0, 40);
 }
 
 function escapeHtml(s: string) {
@@ -124,7 +128,7 @@ function buildExportText(h: HistoryItem) {
     `AI 투자 복기 리포트`,
     `- 날짜: ${created}`,
     `- 타입: ${label}`,
-    `- 종목: ${h.ticker}`,
+    `- 종목(검색어): ${h.ticker}`,
     `- 진입가: ${h.entryPrice}`,
     `- 손절가: ${sl}`,
     ``,
@@ -154,36 +158,6 @@ async function copyText(text: string) {
   document.body.removeChild(ta);
 }
 
-// ====== ✅ 무료 사용 제한(하루 2회) ======
-const DAILY_LIMIT = 2;
-const DAILY_LIMIT_KEY = "daily_ai_limit_v1";
-
-type DailyUsage = { date: string; count: number };
-
-function todayKeyISO() {
-  // YYYY-MM-DD
-  return new Date().toISOString().slice(0, 10);
-}
-
-function readDailyUsage(): DailyUsage {
-  const today = todayKeyISO();
-  const raw = localStorage.getItem(DAILY_LIMIT_KEY);
-  if (!raw) return { date: today, count: 0 };
-
-  try {
-    const parsed = JSON.parse(raw) as DailyUsage;
-    if (!parsed?.date || typeof parsed.count !== "number") return { date: today, count: 0 };
-    if (parsed.date !== today) return { date: today, count: 0 };
-    return parsed;
-  } catch {
-    return { date: today, count: 0 };
-  }
-}
-
-function writeDailyUsage(next: DailyUsage) {
-  localStorage.setItem(DAILY_LIMIT_KEY, JSON.stringify(next));
-}
-
 export default function Page() {
   const [tradeType, setTradeType] = useState<TradeType>("long");
 
@@ -197,9 +171,6 @@ export default function Page() {
 
   // ✅ 히스토리 state
   const [history, setHistory] = useState<HistoryItem[]>([]);
-
-  // ✅ 오늘 사용량 표시용
-  const [dailyCount, setDailyCount] = useState(0);
 
   // ✅ 최초 1회: localStorage 로드
   useEffect(() => {
@@ -216,11 +187,6 @@ export default function Page() {
     if (typeof window !== "undefined") {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
     }
-
-    // ✅ 오늘 사용량 초기화/표시
-    const usage = readDailyUsage();
-    writeDailyUsage(usage); // 날짜 바뀌면 자동 0으로
-    setDailyCount(usage.count);
   }, []);
 
   function persistHistory(next: HistoryItem[]) {
@@ -263,9 +229,7 @@ export default function Page() {
       const w = window.open("", "_blank", "noopener,noreferrer");
       if (w) {
         w.document.write(
-          `<pre style="white-space:pre-wrap;font-family:system-ui;padding:16px">${escapeHtml(
-            text
-          )}</pre>`
+          `<pre style="white-space:pre-wrap;font-family:system-ui;padding:16px">${escapeHtml(text)}</pre>`
         );
         w.document.close();
       } else {
@@ -297,36 +261,12 @@ export default function Page() {
   const cacheRef = useRef<
     Record<
       TradeType,
-      {
-        ticker: string;
-        entryPrice: number;
-        stopLoss: number | "";
-        reasonNote: string;
-        result: string;
-      }
+      { ticker: string; entryPrice: number; stopLoss: number | ""; reasonNote: string; result: string }
     >
   >({
-    long: {
-      ticker: "AAPL",
-      entryPrice: 100,
-      stopLoss: "",
-      reasonNote: "",
-      result: "",
-    },
-    swing: {
-      ticker: "AAPL",
-      entryPrice: 100,
-      stopLoss: "",
-      reasonNote: "",
-      result: "",
-    },
-    day: {
-      ticker: "AAPL",
-      entryPrice: 100,
-      stopLoss: "",
-      reasonNote: "",
-      result: "",
-    },
+    long: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
+    swing: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
+    day: { ticker: "AAPL", entryPrice: 100, stopLoss: "", reasonNote: "", result: "" },
   });
 
   // ✅ 탭 변경 시: 이전 탭 저장 → 새 탭 복원
@@ -350,14 +290,6 @@ export default function Page() {
   const title = useMemo(() => `AI 투자 복기 리포트 (MVP)`, []);
 
   async function onGenerate() {
-    // ✅ 하루 2회 제한 (localStorage 기준)
-    const usage = readDailyUsage();
-    if (usage.count >= DAILY_LIMIT) {
-      alert("무료 버전은 하루에 2회까지만 AI 복기 리포트를 생성할 수 있어요 🙏");
-      return;
-    }
-
-    // ✅ GA 이벤트: 리포트 생성
     gaEvent(GA_EVENT.GENERATE_REPORT, { tradeType, ticker });
 
     setLoading(true);
@@ -368,7 +300,7 @@ export default function Page() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ticker,
+          ticker, // ✅ 한글/영문 검색어 그대로 전송
           entryPrice,
           stopLoss: stopLoss === "" ? null : stopLoss,
           reasonNote,
@@ -383,14 +315,9 @@ export default function Page() {
         return;
       }
 
-      // ✅ 성공했을 때만 카운트 +1
-      writeDailyUsage({ date: usage.date, count: usage.count + 1 });
-      setDailyCount(usage.count + 1);
-
       const text = data?.text ?? "응답에 text가 없습니다.";
       setResult(text);
 
-      // ✅ 생성 성공 시 히스토리에 저장 (최대 10개)
       saveToHistory({
         tradeType,
         ticker,
@@ -451,7 +378,7 @@ export default function Page() {
   <h1>${escapeHtml(docTitle)}</h1>
   <div class="meta">
     Type: ${escapeHtml(label)}
-    / Ticker: ${escapeHtml(ticker)}
+    / Query: ${escapeHtml(ticker)}
     / Entry: ${escapeHtml(String(entryPrice))}
     / StopLoss: ${escapeHtml(stopLossText)}
   </div>
@@ -526,11 +453,6 @@ export default function Page() {
         장기/스윙/단타 탭으로 분리해서 기록합니다. (무료: 최근 {FREE_HISTORY_LIMIT}개 오프라인 저장)
       </p>
 
-      {/* ✅ 오늘 무료 사용량 */}
-      <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 10 }}>
-        오늘 무료 사용: {dailyCount} / {DAILY_LIMIT} (남은 횟수: {Math.max(0, DAILY_LIMIT - dailyCount)})
-      </div>
-
       {/* 탭 */}
       <div style={{ display: "flex", gap: 10, margin: "14px 0 18px" }}>
         {(["long", "swing", "day"] as TradeType[]).map(tabBtn)}
@@ -547,10 +469,11 @@ export default function Page() {
       >
         <div style={{ display: "grid", gap: 12 }}>
           <label style={{ fontWeight: 800 }}>
-            종목/티커
+            종목/티커/코인명 (검색어)
             <input
               value={ticker}
               onChange={(e) => setTicker(clampTicker(e.target.value))}
+              placeholder="예: 애플 / AAPL / 삼성전자 / 005930 / 비트코인 / BTC"
               style={{
                 width: "100%",
                 padding: 12,
@@ -761,9 +684,7 @@ export default function Page() {
         </div>
 
         {history.length === 0 ? (
-          <p style={{ color: "#6b7280", marginTop: 10 }}>
-            아직 저장된 복기가 없습니다. 리포트를 생성하면 자동으로 저장돼요.
-          </p>
+          <p style={{ color: "#6b7280", marginTop: 10 }}>아직 저장된 복기가 없습니다. 리포트를 생성하면 자동으로 저장돼요.</p>
         ) : (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
             {history.map((h) => (
