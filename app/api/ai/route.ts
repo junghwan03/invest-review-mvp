@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
-type TradeType = "long" | "swing" | "day";
+type TradeType = "long" | "swing" | "day" | "etf";
 
 function normalizeTradeType(v: any): TradeType {
-  if (v === "long" || v === "swing" || v === "day") return v;
+  if (v === "long" || v === "swing" || v === "day" || v === "etf") return v;
   return "long";
 }
 
 function getInstruction(tradeType: TradeType) {
-const commonRules = `
+  const commonRules = `
 너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
 장황하지 않게, "기준/행동/숫자" 중심으로 쓴다.
 메모가 부실하면 "추가로 적어야 할 항목"을 구체적으로 요구한다.
@@ -28,11 +28,10 @@ const commonRules = `
   - 일관성: 5/10점 — (근거 한 줄)
 - 3) 감정 경고 (있/없 + 근거 1줄)
 - 4) 매매 유형 분류 (반드시 아래 값 중 하나로만 출력)
-  - 장기투자 / 스윙 / 단타
+  - 장기투자 / 스윙 / 단타 / ETF
 - 5) 개선 액션 3개 (각 1줄, 행동형)
 - 6) 다음 진입 체크리스트 5개 (체크박스 형태로 짧게)
 `;
-
 
   const longGuide = `
 [역할]
@@ -90,9 +89,30 @@ ${commonRules}
 ${commonRules}
 `;
 
+  const etfGuide = `
+[역할]
+너는 ETF 복기 코치다. 개별 종목 분석보다 "상품 구조/추종지수/비용/분배금/리밸런싱/포트 역할"을 본다.
+단타/차트 얘기는 최소화하고 장기 자산배분 관점으로 지도한다.
+
+[중점 평가(ETF 전용)]
+- ETF의 역할: 코어/위성/배당/방어/성장/헤지 중 무엇인지 1문장으로 정의했는가?
+- 추종지수/전략: S&P500/나스닥/커버드콜/팩터/리츠/채권/레버리지/인버스 등 구조 이해가 있는가?
+- 비용: 총보수(TER) 또는 운용보수 인식이 있는가? “싸다/비싸다” 기준이 있는가?
+- 분배금: 기대한다면 분배금 변동성/재투자(재매수) 계획이 있는가?
+- 리밸런싱 규칙: 추가매수 조건(가격/비중/주기) + 중단 조건(전략이 깨지는 조건)이 있는가?
+- 리스크: 레버리지/환율/금리/섹터 편중 등 핵심 리스크를 1~2개라도 적었는가?
+
+[체크리스트는 ETF 전용으로만]
+예) 역할 정의, 지수/전략, 비용, 분배금/재투자, 리밸런싱/중단조건, 핵심 리스크
+
+[매매 유형 분류는 반드시 "ETF"]
+${commonRules}
+`;
+
   if (tradeType === "long") return longGuide;
   if (tradeType === "swing") return swingGuide;
-  return dayGuide;
+  if (tradeType === "day") return dayGuide;
+  return etfGuide;
 }
 
 export async function POST(req: Request) {
@@ -100,6 +120,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const tickerRaw = body?.ticker ?? "";
     const entryPrice = body?.entryPrice ?? "";
+    const stopLoss = body?.stopLoss ?? null; // ✅ page.tsx에서 보내고 있으면 같이 반영됨
     const reasonNote = body?.reasonNote ?? "";
     const tradeType = normalizeTradeType(body?.tradeType);
 
@@ -117,6 +138,7 @@ export async function POST(req: Request) {
 [매매유형] ${tradeType}
 [종목] ${String(tickerRaw).toUpperCase()}
 [진입가] ${entryPrice}
+[손절가] ${stopLoss === null || stopLoss === "" ? "N/A" : stopLoss}
 [메모]
 ${reasonNote}
 `;
