@@ -206,7 +206,7 @@ async function copyText(text: string) {
 }
 
 // ====== ✅ 무료 사용 제한(하루 2회) ======
-const DAILY_LIMIT = 2;
+const DAILY_LIMIT = 3;
 const DAILY_LIMIT_KEY = "daily_ai_limit_v1";
 type DailyUsage = { date: string; count: number };
 
@@ -884,7 +884,7 @@ export default function Page() {
 
     const usage = readDailyUsage();
     if (usage.count >= DAILY_LIMIT) {
-      alert("무료 버전은 하루에 2회까지만 AI 복기 리포트를 생성할 수 있습니다.");
+      alert("무료 버전은 하루에 3회까지만 AI 복기 리포트를 생성할 수 있습니다.");
       return;
     }
 
