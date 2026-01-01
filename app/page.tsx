@@ -84,6 +84,17 @@ const EXAMPLE_NOTES: Record<TradeType, string> = {
 - 리밸: 분기 1회, 목표 비중에서 ±5% 벗어나면 조정
 - 정리: 목표 변경 또는 장기 하락 추세 전환(예: 200일선 이탈 2개월 유지)`,
 };
+function getApiUrl(path: string) {
+  const origin =
+    typeof process !== "undefined"
+      ? (process.env.NEXT_PUBLIC_API_ORIGIN ?? "")
+      : "";
+
+  const clean = origin.replace(/\/$/, "");
+  return clean ? `${clean}${path}` : path;
+}
+
+
 
 // ✅✅✅ FIX: 한글/영문/숫자/공백/.-_ 허용 (종목명/티커/ETF 검색어로 사용)
 function clampTicker(v: string) {
@@ -894,17 +905,21 @@ export default function Page() {
     setResult("AI가 리포트를 작성 중입니다...");
 
     try {
-      const res = await fetch("/api/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ticker,
-          entryPrice,
-          stopLoss: stopLoss === "" ? null : stopLoss,
-          reasonNote: buildReasonForAI(),
-          tradeType,
-        }),
-      });
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://invest-review-mvp.vercel.app";
+
+const res = await fetch(`${API_BASE}/api/ai`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    ticker,
+    entryPrice,
+    stopLoss: stopLoss === "" ? null : stopLoss,
+    reasonNote: buildReasonForAI(),
+    tradeType,
+  }),
+});
+
 
       const data = await res.json();
 
