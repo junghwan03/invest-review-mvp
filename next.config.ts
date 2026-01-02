@@ -1,12 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // ❌ Vercel 배포할 땐 이거 주석 처리 필수! (API가 살아야 하니까요)
+  // ❌ Vercel 배포할 땐 이거 주석 처리 필수! (그래야 API가 살아납니다)
   // output: "export", 
   
   images: { unoptimized: true },
 
-  // ✅ CORS 설정 (이게 있어야 토스 앱이 거부 안 당함)
+  // ✅ CORS 설정 (이게 있어야 토스 앱이 요청했을 때 거절 안 당함)
   async headers() {
     return [
       {
