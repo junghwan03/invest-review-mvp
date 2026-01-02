@@ -1,6 +1,6 @@
 {
   "name": "invest-review-mvp",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
@@ -8,7 +8,7 @@
     "start": "next start -p 3000",
     "lint": "eslint",
     "dev:toss": "granite dev",
-    "build:toss": "next build && next export && npm run export:web && granite build",
+    "build:toss": "next build && npm run export:web && granite build",
     "export:web": "node -e \"const fs=require('fs'); fs.rmSync('.next/web',{recursive:true,force:true}); fs.mkdirSync('.next/web',{recursive:true}); fs.cpSync('out','.next/web',{recursive:true});\"",
     "deploy": "ait deploy"
   },

@@ -86,12 +86,14 @@ const EXAMPLE_NOTES: Record<TradeType, string> = {
 };
 
 function getApiUrl(path: string) {
-  // ✅ 배포/로컬 모두 대응:
-  // - NEXT_PUBLIC_API_ORIGIN이 있으면 절대경로로 붙여서 호출
-  // - 없으면 상대경로(/api/ai)로 호출
-  const origin = typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_API_ORIGIN ?? "") : "";
+  // ✅ [수정됨] 토스 앱(Static)에서 Vercel 서버로 요청을 보내기 위해 주소를 고정합니다.
+  // process.env.NEXT_PUBLIC_API_ORIGIN이 설정되어 있다면 그걸 쓰고,
+  // 없다면 님의 Vercel 배포 주소를 기본값으로 사용합니다.
+  const VERCEL_URL = "https://invest-review-mvp.vercel.app";
+  const origin = typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_API_ORIGIN ?? VERCEL_URL) : VERCEL_URL;
+  
   const clean = origin.replace(/\/$/, "");
-  return clean ? `${clean}${path}` : path;
+  return `${clean}${path}`;
 }
 
 // ✅✅✅ FIX: 한글/영문/숫자/공백/.-_ 허용 (종목명/티커/ETF 검색어로 사용)
@@ -923,6 +925,7 @@ export default function Page() {
     setResult("AI가 리포트를 작성 중입니다...");
 
     try {
+      // ✅ 여기서 위에서 만든 함수를 사용하므로, 이제 Vercel 주소로 자동 연결됩니다.
       const API_URL = getApiUrl("/api/ai");
 
       const res = await fetch(API_URL, {
@@ -930,6 +933,7 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ticker,
+          entryPrice,
           entryPrice,
           stopLoss: stopLoss === "" ? null : stopLoss,
           reasonNote: buildReasonForAI(),
