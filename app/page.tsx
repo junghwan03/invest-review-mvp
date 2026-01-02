@@ -84,17 +84,15 @@ const EXAMPLE_NOTES: Record<TradeType, string> = {
 - 리밸: 분기 1회, 목표 비중에서 ±5% 벗어나면 조정
 - 정리: 목표 변경 또는 장기 하락 추세 전환(예: 200일선 이탈 2개월 유지)`,
 };
-function getApiUrl(path: string) {
-  const origin =
-    typeof process !== "undefined"
-      ? (process.env.NEXT_PUBLIC_API_ORIGIN ?? "")
-      : "";
 
+function getApiUrl(path: string) {
+  // ✅ 배포/로컬 모두 대응:
+  // - NEXT_PUBLIC_API_ORIGIN이 있으면 절대경로로 붙여서 호출
+  // - 없으면 상대경로(/api/ai)로 호출
+  const origin = typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_API_ORIGIN ?? "") : "";
   const clean = origin.replace(/\/$/, "");
   return clean ? `${clean}${path}` : path;
 }
-
-
 
 // ✅✅✅ FIX: 한글/영문/숫자/공백/.-_ 허용 (종목명/티커/ETF 검색어로 사용)
 function clampTicker(v: string) {
@@ -216,7 +214,7 @@ async function copyText(text: string) {
   document.body.removeChild(ta);
 }
 
-// ====== ✅ 무료 사용 제한(하루 2회) ======
+// ====== ✅ 무료 사용 제한(하루 3회) ======
 const DAILY_LIMIT = 3;
 const DAILY_LIMIT_KEY = "daily_ai_limit_v1";
 type DailyUsage = { date: string; count: number };
@@ -521,6 +519,26 @@ const BOARDING_BULLETS = [
   "숫자(진입가/손절/목표) + 판단 기준(시나리오가 깨지는 조건)을 적을수록 AI 품질이 좋아집니다.",
   "AI 결과는 참고용이며, 최종 판단과 책임은 본인에게 있습니다.",
 ];
+
+// ✅✅✅ 안전 JSON 파싱(fetch 응답이 HTML/빈값이어도 안터지게)
+async function safeReadResponse(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
+  const raw = await res.text();
+
+  if (!raw || !raw.trim()) {
+    return { raw: "", data: null as any };
+  }
+
+  if (contentType.includes("application/json")) {
+    try {
+      return { raw, data: JSON.parse(raw) as any };
+    } catch {
+      return { raw, data: null as any };
+    }
+  }
+
+  return { raw, data: null as any };
+}
 
 export default function Page() {
   // ✅ 1차 탭(주식/코인)
@@ -905,30 +923,25 @@ export default function Page() {
     setResult("AI가 리포트를 작성 중입니다...");
 
     try {
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
-  "https://invest-review-mvp.vercel.app";
+      const API_URL = getApiUrl("/api/ai");
 
-const API_URL = `${API_BASE}/api/ai`;
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker,
+          entryPrice,
+          stopLoss: stopLoss === "" ? null : stopLoss,
+          reasonNote: buildReasonForAI(),
+          tradeType,
+        }),
+      });
 
-const res = await fetch(API_URL, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    ticker,
-    entryPrice,
-    stopLoss: stopLoss === "" ? null : stopLoss,
-    reasonNote: buildReasonForAI(),
-    tradeType,
-  }),
-});
-
-
-
-      const data = await res.json();
+      const { raw, data } = await safeReadResponse(res);
 
       if (!res.ok) {
-        setResult(`서버 에러 (${res.status}): ${data?.text ?? JSON.stringify(data)}`);
+        const msg = (data && data.text) ? data.text : (raw ? raw.slice(0, 400) : "서버 응답이 비어 있습니다.");
+        setResult(`서버 에러 (${res.status}): ${msg}`);
         return;
       }
 

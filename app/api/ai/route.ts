@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs"; // ✅ Vercel에서 Route Handler를 Node 런타임으로 강제
+export const runtime = "nodejs";
 
 type TradeType = "long" | "swing" | "day" | "etf";
 
@@ -117,9 +117,59 @@ ${commonRules}
   return etfGuide;
 }
 
+function jsonResponse(payload: any, status = 200) {
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function safeReadJson(req: Request) {
+  try {
+    const text = await req.text();
+    if (!text || !text.trim()) return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function parseOpenAIResponse(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
+  const raw = await res.text();
+
+  if (!raw || !raw.trim()) return { raw: "", data: null as any };
+
+  if (contentType.includes("application/json")) {
+    try {
+      return { raw, data: JSON.parse(raw) };
+    } catch {
+      return { raw, data: null as any };
+    }
+  }
+
+  return { raw, data: null as any };
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await safeReadJson(req);
+
     const tickerRaw = body?.ticker ?? "";
     const entryPrice = body?.entryPrice ?? "";
     const stopLoss = body?.stopLoss ?? null;
@@ -128,7 +178,10 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ text: "OPENAI_API_KEY가 없습니다. (Vercel Env 확인 필요)" }, { status: 500 });
+      return jsonResponse(
+        { ok: false, text: "OPENAI_API_KEY가 없습니다. (Vercel Environment Variables 확인)" },
+        500
+      );
     }
 
     const instruction = getInstruction(tradeType);
@@ -140,7 +193,7 @@ export async function POST(req: Request) {
 [손절가] ${stopLoss === null || stopLoss === "" ? "N/A" : stopLoss}
 [메모]
 ${reasonNote}
-`;
+`.trim();
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -148,33 +201,40 @@ ${reasonNote}
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      cache: "no-store", // ✅
+      cache: "no-store",
       body: JSON.stringify({
         model: "gpt-4.1-mini",
         temperature: 0.35,
         messages: [
           { role: "system", content: instruction.trim() },
-          { role: "user", content: userContext.trim() },
+          { role: "user", content: userContext },
         ],
       }),
     });
 
-    const raw = await res.text();
-    let data: any = null;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      data = { raw };
-    }
+    const { raw, data } = await parseOpenAIResponse(res);
 
     if (!res.ok) {
-      const msg = data?.error?.message ?? raw;
-      return NextResponse.json({ text: `OpenAI 에러 (${res.status}): ${msg}` }, { status: 500 });
+      const msg =
+        data?.error?.message ||
+        (raw ? raw.slice(0, 400) : "OpenAI 응답이 비어 있습니다.");
+      return jsonResponse({ ok: false, text: `OpenAI 에러 (${res.status}): ${msg}` }, 500);
     }
 
-    const text = data?.choices?.[0]?.message?.content ?? "응답 없음";
-    return NextResponse.json({ text }, { status: 200 });
+    const text = data?.choices?.[0]?.message?.content;
+    if (!text || typeof text !== "string") {
+      return jsonResponse(
+        {
+          ok: false,
+          text: "OpenAI 응답 파싱 실패(choices/message/content 없음)",
+          debug: raw?.slice(0, 400),
+        },
+        500
+      );
+    }
+
+    return jsonResponse({ ok: true, text }, 200);
   } catch (e: any) {
-    return NextResponse.json({ text: `서버 오류: ${String(e?.message ?? e)}` }, { status: 500 });
+    return jsonResponse({ ok: false, text: `서버 오류: ${String(e?.message ?? e)}` }, 500);
   }
 }
