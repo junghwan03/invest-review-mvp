@@ -927,19 +927,19 @@ export default function Page() {
     try {
       // ✅ 여기서 위에서 만든 함수를 사용하므로, 이제 Vercel 주소로 자동 연결됩니다.
       const API_URL = getApiUrl("/api/ai");
+// app/page.tsx의 onGenerate 함수 내부
 
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ticker,
-          entryPrice,
-          entryPrice,
-          stopLoss: stopLoss === "" ? null : stopLoss,
-          reasonNote: buildReasonForAI(),
-          tradeType,
-        }),
-      });
+const res = await fetch(API_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    ticker,
+    entryPrice,       // ✅ 한 번만 있어야 합니다.
+    stopLoss: stopLoss === "" ? null : stopLoss,
+    reasonNote: buildReasonForAI(),
+    tradeType,
+  }),
+});
 
       const { raw, data } = await safeReadResponse(res);
 
