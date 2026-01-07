@@ -4,7 +4,6 @@
 
 import { useMemo, useRef, useState, useEffect } from "react";
 import { gaEvent, GA_EVENT } from "@/lib/ga";
-// 1단계에서 만든 constants.ts에서 데이터와 타입을 불러옵니다.
 import {
   AssetType,
   TradeType,
@@ -41,10 +40,10 @@ function AlertModal({
         background: "rgba(0,0,0,0.5)", zIndex: 9999,
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       }}
-      onClick={onClose} // 배경 클릭 시 닫기
+      onClick={onClose}
     >
       <div
-        onClick={(e) => e.stopPropagation()} // 내부 클릭 시 닫힘 방지
+        onClick={(e) => e.stopPropagation()}
         style={{
           background: "white", width: "100%", maxWidth: 320, borderRadius: 16,
           padding: 24, boxShadow: "0 4px 12px rgba(0,0,0,0.15)", textAlign: "center",
@@ -84,7 +83,7 @@ function InputModal({
   const [val, setVal] = useState("");
 
   useEffect(() => {
-    if (isOpen) setVal(""); // 모달 열릴 때 입력값 초기화
+    if (isOpen) setVal("");
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -357,9 +356,6 @@ export default function Page() {
     long: false, swing: false, day: false, etf: false,
   });
 
-  // =====================================
-  // ✅ 모달 상태 관리 (Alert & Prompt 대체)
-  // =====================================
   const [alertMsg, setAlertMsg] = useState("");
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [isInputOpen, setIsInputOpen] = useState(false);
@@ -368,8 +364,6 @@ export default function Page() {
     setAlertMsg(msg);
     setIsAlertOpen(true);
   }
-
-  // =====================================
 
   useEffect(() => {
     const list = safeJsonParse<HistoryItem[]>(typeof window !== "undefined" ? localStorage.getItem(HISTORY_KEY) : null, []);
@@ -407,14 +401,11 @@ export default function Page() {
     localStorage.setItem(PRESET_KEY, JSON.stringify(trimmed));
   }
 
-  // ✅ [중요] Prompt(입력창) 제거 → 모달 열기 함수로 변경
   function handlePresetSaveClick() { setIsInputOpen(true); }
 
-  // ✅ [중요] 모달에서 '저장' 눌렀을 때 실행되는 함수
   function handlePresetSaveConfirm(name: string) {
-    setIsInputOpen(false); // 모달 닫기
+    setIsInputOpen(false);
     if (!name?.trim()) return;
-
     const item: Preset = {
       id: rid(), createdAt: Date.now(), name: name.trim().slice(0, 30),
       tradeType, ticker, entryPrice, stopLoss: stopLoss === "" ? null : stopLoss,
@@ -422,7 +413,7 @@ export default function Page() {
     };
     persistPresets([item, ...presets]);
     setPresetOpen(true);
-    showAlert("프리셋이 저장되었습니다."); // ✅ Alert 대체
+    showAlert("프리셋이 저장되었습니다.");
   }
 
   function deletePreset(id: string) { persistPresets(presets.filter((p) => p.id !== id)); }
@@ -440,9 +431,9 @@ export default function Page() {
     const text = buildExportText(h);
     try {
       await copyText(text);
-      showAlert("복기 텍스트를 복사했습니다. (붙여넣기 하시면 됩니다)"); // ✅ Alert 대체
+      showAlert("복기 텍스트를 복사했습니다. (붙여넣기 하시면 됩니다)");
     } catch {
-      showAlert("복사에 실패했습니다. 텍스트를 직접 복사해주세요."); // ✅ Alert 대체
+      showAlert("복사에 실패했습니다. 텍스트를 직접 복사해주세요.");
     }
   }
 
@@ -505,12 +496,12 @@ export default function Page() {
   function buildReasonForAI() { const base = (reasonNote ?? "").trim(); const ck = buildChecklistSummary(checklist); return (base ? base : "(메모 없음)") + ck; }
 
   async function onGenerate() {
-    if (assetType !== "stock") { showAlert("현재는 주식 탭만 지원합니다."); return; } // ✅ Alert 대체
-    if (!ticker.trim()) { showAlert("종목/티커를 입력해 주세요."); return; } // ✅ Alert 대체
-    if (!Number.isFinite(entryPrice) || entryPrice <= 0) { showAlert("진입가(필수)를 올바르게 입력해 주세요."); return; } // ✅ Alert 대체
-    if (!rulesCheckedOnce[tradeType]) { setRulesOpen(true); showAlert("AI 생성 전에 ‘규칙 체크(점검)’을 최소 1회 진행해 주세요."); return; } // ✅ Alert 대체
+    if (assetType !== "stock") { showAlert("현재는 주식 탭만 지원합니다."); return; }
+    if (!ticker.trim()) { showAlert("종목/티커를 입력해 주세요."); return; }
+    if (!Number.isFinite(entryPrice) || entryPrice <= 0) { showAlert("진입가(필수)를 올바르게 입력해 주세요."); return; }
+    if (!rulesCheckedOnce[tradeType]) { setRulesOpen(true); showAlert("AI 생성 전에 ‘규칙 체크(점검)’을 최소 1회 진행해 주세요."); return; }
     const usage = readDailyUsage();
-    if (usage.count >= DAILY_LIMIT) { showAlert("무료 버전은 하루에 3회까지만 AI 복기 리포트를 생성할 수 있습니다."); return; } // ✅ Alert 대체
+    if (usage.count >= DAILY_LIMIT) { showAlert("무료 버전은 하루에 3회까지만 AI 복기 리포트를 생성할 수 있습니다."); return; }
 
     gaEvent(GA_EVENT.GENERATE_REPORT, { tradeType, ticker });
     setLoading(true);
@@ -549,20 +540,35 @@ export default function Page() {
     setRulesOpen(true); setCheckOpen(false); setCheckResult(null);
   }
 
-  function onPrintPdfResultOnly() {
+  // ✅ [수정됨] PDF 인쇄 대신 -> '공유하기/복사하기' 기능으로 변경 (모바일 호환성 100%)
+  async function onShareOrCopy() {
     if (!result) return;
     gaEvent(GA_EVENT.DOWNLOAD_PDF, { tradeType, ticker });
-    const label = TAB_LABEL[tradeType];
-    const docTitle = `AI 투자 복기 리포트 - ${label} - ${ticker}`;
-    const stopLossText = stopLoss === "" ? "N/A" : String(stopLoss);
-    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>${escapeHtml(docTitle)}</title><style>body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; } h1 { font-size: 18px; margin: 0 0 10px; } .meta { color: #555; font-size: 12px; margin-bottom: 14px; } pre { white-space: pre-wrap; line-height: 1.6; font-size: 13px; } @media print { body { padding: 0; } }</style></head><body><h1>${escapeHtml(docTitle)}</h1><div class="meta">Type: ${escapeHtml(label)} / Query: ${escapeHtml(ticker)} / Entry: ${escapeHtml(String(entryPrice))} / StopLoss: ${escapeHtml(stopLossText)}</div><pre>${escapeHtml(result)}</pre></body></html>`.trim();
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed"; iframe.style.right = "0"; iframe.style.bottom = "0"; iframe.style.width = "0"; iframe.style.height = "0"; iframe.style.border = "0"; iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow?.document;
-    if (!doc) { document.body.removeChild(iframe); return; }
-    doc.open(); doc.write(html); doc.close();
-    setTimeout(() => { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); setTimeout(() => { document.body.removeChild(iframe); }, 1000); }, 250);
+
+    const shareTitle = `AI 투자 복기 - ${ticker}`;
+    const shareText = `[AI 투자 복기 리포트]\n\n종목: ${ticker}\n진입가: ${entryPrice}\n손절가: ${stopLoss || "없음"}\n\n${result}`;
+
+    // 1. 모바일 앱(토스 등)에서는 '네이티브 공유' 창을 띄웁니다.
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+        });
+        return; // 공유 창이 뜨면 여기서 끝
+      } catch (err) {
+        // 사용자가 취소했거나 에러 나면 아래 복사 로직으로 넘어감
+        console.log("공유 취소됨");
+      }
+    }
+
+    // 2. 공유 기능이 없거나(PC), 실패하면 -> '클립보드 복사'로 대체
+    try {
+      await copyText(shareText);
+      showAlert("결과 내용이 복사되었습니다.\n메모장이나 카톡에 붙여넣기 해주세요!");
+    } catch {
+      showAlert("복사에 실패했습니다. 텍스트를 직접 드래그해서 복사해주세요.");
+    }
   }
 
   const assetBtn = (key: AssetType) => {
@@ -581,7 +587,6 @@ export default function Page() {
 
   return (
     <main style={{ maxWidth: 920, margin: "24px auto", padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
-      {/* ✅ [추가됨] 알림 및 입력 모달 */}
       <AlertModal isOpen={isAlertOpen} message={alertMsg} onClose={() => setIsAlertOpen(false)} />
       <InputModal isOpen={isInputOpen} title="프리셋 이름 저장" placeholder="예: 내 단타 규칙" onConfirm={handlePresetSaveConfirm} onCancel={() => setIsInputOpen(false)} />
 
@@ -646,7 +651,6 @@ export default function Page() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                   <div style={{ fontWeight: 900, color: "#111827" }}>프리셋(규칙 세트)</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {/* ✅ [수정됨] prompt 대신 모달 오픈 함수 사용 */}
                     <button onClick={handlePresetSaveClick} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }} title="현재 입력 + 체크리스트(텍스트)를 프리셋으로 저장">프리셋 저장</button>
                     <button onClick={() => setPresetOpen((v) => !v)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>{presetOpen ? "프리셋 닫기" : "프리셋 보기"}</button>
                   </div>
@@ -684,7 +688,7 @@ export default function Page() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <button onClick={onGenerate} disabled={loading} style={{ flex: 1, minWidth: 260, padding: "14px 16px", borderRadius: 12, border: "none", background: loading ? "#93c5fd" : "#2563eb", color: "white", fontWeight: 900, cursor: loading ? "not-allowed" : "pointer" }}>{loading ? "작성 중..." : "AI 복기 리포트 생성"}</button>
                 <button onClick={onCheckNote} disabled={!ticker.trim() && !reasonNote.trim()} title={!ticker.trim() && !reasonNote.trim() ? "종목/메모를 조금이라도 작성해 주세요." : "AI 없이 메모 품질을 점검합니다."} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: !ticker.trim() && !reasonNote.trim() ? "not-allowed" : "pointer", opacity: !ticker.trim() && !reasonNote.trim() ? 0.5 : 1 }}>메모 점검(무료)</button>
-                <button onClick={onPrintPdfResultOnly} disabled={!result} title={!result ? "먼저 결과를 생성해 주세요." : "결과만 PDF로 저장합니다."} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: !result ? "not-allowed" : "pointer", opacity: !result ? 0.5 : 1 }}>PDF로 저장(결과만)</button>
+                <button onClick={onShareOrCopy} disabled={!result} title={!result ? "먼저 결과를 생성해 주세요." : "결과를 공유하거나 복사합니다."} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: !result ? "not-allowed" : "pointer", opacity: !result ? 0.5 : 1 }}>결과 공유/저장 📤</button>
                 <button onClick={onClearAll} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>결과/입력 리셋</button>
               </div>
 
