@@ -479,7 +479,7 @@ export default function Page() {
     prevAssetType.current = assetType;
   }, [assetType]);
 
-  const title = useMemo(() => `AI 투자 복기 리포트 (MVP)`, []);
+  const title = useMemo(() => ` AI 투자 복기 & 매매 규칙 체크 `, []);
 
   function onCheckNote() {
     const r = buildNoteCheck(tradeType, entryPrice, stopLoss, reasonNote);
