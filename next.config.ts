@@ -21,30 +21,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;import type { NextConfig } from "next";
-
-// 💡 핵심: Vercel 서버인지 확인하는 변수
-const isVercel = process.env.VERCEL === '1';
-
-const nextConfig: NextConfig = {
-  // ✅ Vercel 배포중이면 'export' 끄기(API 작동), 내 컴퓨터면 'export' 켜기(토스 빌드용)
-  output: isVercel ? undefined : "export",
-
-  images: { unoptimized: true },
-
-  // CORS 설정 (Vercel API 사용 시 필요)
-  async headers() {
-    return [
-      {
-        source: "/api/:path*",
-        headers: [
-          { key: "Access-Control-Allow-Origin", value: "*" },
-          { key: "Access-Control-Allow-Methods", value: "GET,POST,OPTIONS" },
-          { key: "Access-Control-Allow-Headers", value: "Content-Type" },
-        ],
-      },
-    ];
-  },
-};
-
 export default nextConfig;
