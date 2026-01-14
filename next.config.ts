@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // ✅ [수정됨] 토스 앱 빌드(.ait 생성)를 위해 필수입니다! (주석 해제)
-  //output: "export", 
+  output: "export", 
   
   images: { unoptimized: true },
 
