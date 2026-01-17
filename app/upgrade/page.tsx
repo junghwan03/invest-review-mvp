@@ -187,7 +187,7 @@ export default function UpgradePage() {
                       onChange={e => setManualData({...manualData, [k]: e.target.value})} 
                     />
                     <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>
-                      {(k === "per" || k === "pbr") ? "배" : "%"}
+                      {(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}
                     </span>
                   </div>
                 ))}
