@@ -21,12 +21,11 @@ const HISTORY_KEY = "analysis_history_v1";
 export default function UpgradePage() {
   const [mode, setMode] = useState<"single" | "portfolio">("single");
   const [loading, setLoading] = useState(false);
-  const [visionLoading, setVisionLoading] = useState(false); // 📸 스캔 로딩 상태
+  const [visionLoading, setVisionLoading] = useState(false);
   const [imgLoading, setImgLoading] = useState(false);
   const [result, setResult] = useState("");
   const [remaining, setRemaining] = useState<number | null>(null);
 
-  // --- [업로드 상태 및 미리보기 전용 상태] ---
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>(""); 
 
@@ -34,17 +33,14 @@ export default function UpgradePage() {
     styleName: string; expertName: string; matchRate: number; emoji: string;
   } | null>(null);
 
-  // --- [상태 1: 단일 종목 분석] ---
   const [ticker, setTicker] = useState("");
   const [isManual, setIsManual] = useState(false);
   const [manualData, setManualData] = useState({ per: "", roe: "", pbr: "", psr: "" });
 
-  // --- [상태 2: 포트폴리오 비교] ---
   const [portfolio, setPortfolio] = useState<{ ticker: string; weight: number }[]>([]);
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
   const [selectedExpert, setSelectedExpert] = useState("warren_buffett");
 
-  // --- [상태 3: 히스토리] ---
   const [history, setHistory] = useState<any[]>([]);
 
   const matchingCardRef = useRef<HTMLDivElement>(null);
@@ -67,7 +63,6 @@ export default function UpgradePage() {
     if (rawHistory) setHistory(JSON.parse(rawHistory));
   }, []);
 
-  // 📸 스크린샷 분석 함수
   const handleVisionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -158,7 +153,7 @@ export default function UpgradePage() {
     }
     try {
       await navigator.clipboard.writeText(shareText);
-      alert("복사되었습니다!");
+      alert("내용이 복사되었습니다!");
     } catch {
       alert("복사 실패");
     }
@@ -291,26 +286,26 @@ export default function UpgradePage() {
             <div style={{ padding: "14px 10px", background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
               <div style={{ fontWeight: 900, marginBottom: 10, fontSize: 13, color: "#2563eb" }}>나의 포트폴리오</div>
               <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                <input placeholder="종목" style={{ flex: 2, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} value={newStock.ticker} onChange={e => setNewStock({...newStock, ticker: e.target.value})} />
-                <input placeholder="%" style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} type="number" value={newStock.weight} onChange={e => setNewStock({...newStock, weight: e.target.value})} />
+                <input placeholder="종목" style={{ flex: 2, minWidth: 0, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} value={newStock.ticker} onChange={e => setNewStock({...newStock, ticker: e.target.value})} />
+                <input placeholder="%" style={{ flex: 1, minWidth: 0, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} type="number" value={newStock.weight} onChange={e => setNewStock({...newStock, weight: e.target.value})} />
                 <button onClick={addStock} style={{ padding: "0 14px", background: "#2563eb", color: "white", borderRadius: 8, border: "none", fontWeight: 900 }}>+</button>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {portfolio.map((s, i) => (
                   <div key={i} style={{ padding: "6px 10px", background: "white", border: "1.5px solid #2563eb", color: "#2563eb", borderRadius: 99, fontSize: 11, fontWeight: 800 }}>
-                    {s.ticker} {s.weight}% <span onClick={() => setPortfolio(portfolio.filter((_, idx) => idx !== i))} style={{ marginLeft: 3, color: "#ef4444" }}>✕</span>
+                    {s.ticker} {s.weight}% <span onClick={() => setPortfolio(portfolio.filter((_, idx) => idx !== i))} style={{ marginLeft: 3, cursor: "pointer", color: "#ef4444" }}>✕</span>
                   </div>
                 ))}
               </div>
             </div>
             <div>
               <div style={{ fontWeight: 900, marginBottom: 12, fontSize: 14 }}>비교할 투자 고수 선택</div>
-              {/* 🎯 [2x3 그리드] 모바일에서 절대 안 터지게 간격과 패딩 최적화 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {/* 🎯 [2x3 그리드] 핵심 수정: minmax(0, 1fr)로 요소 삐져나감 방지 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
                 {EXPERTS.map(exp => (
-                  <button key={exp.id} onClick={() => setSelectedExpert(exp.id)} style={{ padding: "12px 8px", borderRadius: 12, border: selectedExpert === exp.id ? "2.5px solid #2563eb" : "1px solid #e5e7eb", background: selectedExpert === exp.id ? "#eff6ff" : "white", cursor: "pointer", boxSizing: "border-box", width: "100%" }}>
+                  <button key={exp.id} onClick={() => setSelectedExpert(exp.id)} style={{ padding: "12px 4px", borderRadius: 12, border: selectedExpert === exp.id ? "2.5px solid #2563eb" : "1px solid #e5e7eb", background: selectedExpert === exp.id ? "#eff6ff" : "white", cursor: "pointer", boxSizing: "border-box", width: "100%" }}>
                     <div style={{ fontSize: 22, marginBottom: 2 }}>{exp.emoji}</div>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: "#111827" }}>{exp.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{exp.name}</div>
                   </button>
                 ))}
               </div>
@@ -326,14 +321,14 @@ export default function UpgradePage() {
         </button>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={onShareOrCopy} disabled={!result} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #111827", background: "white", fontWeight: 900, fontSize: 12 }}>공유/복사 📤</button>
-          <button onClick={() => { setResult(""); setTicker(""); setPortfolio([]); setPreviewUrl(null); setUploadStatus(""); }} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, fontSize: 12 }}>입력 초기화</button>
+          <button onClick={() => { setResult(""); setTicker(""); setPortfolio([]); setPreviewUrl(null); setUploadStatus(""); setIsManual(false); }} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, fontSize: 12 }}>초기화</button>
         </div>
       </div>
 
       {/* 🏆 Match Card */}
       {matchingResult && (
         <section style={{ marginTop: 30, textAlign: "center" }}>
-          <div ref={matchingCardRef} style={{ border: "4px solid #2563eb", borderRadius: 20, padding: "30px 16px", boxSizing: "border-box", background: "#ffffff", maxWidth: "100%", margin: "0 auto", boxShadow: "0 10px 20px rgba(0,0,0,0.05)", position: "relative", overflow: "hidden" }}>
+          <div ref={matchingCardRef} style={{ border: "4px solid #2563eb", borderRadius: 20, padding: "30px 16px", boxSizing: "border-box", background: "#ffffff", width: "100%", maxWidth: "100%", margin: "0 auto", boxShadow: "0 10px 20px rgba(0,0,0,0.05)", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: -20, right: -20, opacity: 0.05, fontSize: 120 }}>{matchingResult.emoji}</div>
             <div style={{ fontWeight: 900, color: "#2563eb", fontSize: 11, letterSpacing: 2, marginBottom: 10 }}>INVESTMENT STYLE MATCH</div>
             <h2 style={{ fontSize: 22, fontWeight: 900, marginBottom: 20 }}>"{matchingResult.styleName}"</h2>
@@ -353,7 +348,7 @@ export default function UpgradePage() {
       {/* 분석 결과 */}
       {result && (
         <section style={{ marginTop: 30, border: "1px solid #e5e7eb", borderRadius: 16, padding: "20px 16px", background: "white" }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, marginBottom: 12, color: "#111827", borderBottom: "2px solid #f3f4f6", paddingBottom: 8 }}>분석 리포트</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, marginBottom: 12, color: "#111827", borderBottom: "2.5px solid #f3f4f6", paddingBottom: 8 }}>분석 리포트</h2>
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "#374151" }}>
             <ReactMarkdown>{result}</ReactMarkdown>
           </div>
@@ -361,7 +356,7 @@ export default function UpgradePage() {
       )}
 
       {/* 히스토리 */}
-      <section style={{ marginTop: 40, borderTop: "2px solid #f3f4f6", paddingTop: 30 }}>
+      <section style={{ marginTop: 40, borderTop: "2.5px solid #f3f4f6", paddingTop: 30 }}>
         <h2 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 900 }}>최근 기록</h2>
         {history.length > 0 ? (
           <div style={{ display: "grid", gap: 10 }}>
