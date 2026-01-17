@@ -22,7 +22,6 @@ import {
 // 🎨 UI 컴포넌트: 토스 심사 통과용 모달 (Alert & Prompt 대체)
 // =========================================================
 
-// 1. 단순 알림창 (AlertModal)
 function AlertModal({
   isOpen,
   message,
@@ -66,7 +65,6 @@ function AlertModal({
   );
 }
 
-// 2. 입력창 (InputModal) - 프리셋 저장용
 function InputModal({
   isOpen,
   title,
@@ -81,13 +79,10 @@ function InputModal({
   onCancel: () => void;
 }) {
   const [val, setVal] = useState("");
-
   useEffect(() => {
     if (isOpen) setVal("");
   }, [isOpen]);
-
   if (!isOpen) return null;
-
   return (
     <div
       style={{
@@ -110,7 +105,7 @@ function InputModal({
           placeholder={placeholder}
           style={{
             width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #d1d5db",
-            fontSize: 15, outline: "none", marginBottom: 20, background: "white", color: "black"
+            fontSize: 15, outline: "none", marginBottom: 20, background: "white", color: "black", boxSizing: "border-box"
           }}
         />
         <div style={{ display: "flex", gap: 10 }}>
@@ -139,7 +134,7 @@ function InputModal({
 }
 
 // =========================================================
-// 🧠 비즈니스 로직 (Main Page)
+// 🧠 비즈니스 로직 (749줄 원본 로직 유지)
 // =========================================================
 
 function getApiUrl(path: string) {
@@ -327,6 +322,10 @@ async function safeReadResponse(res: Response) {
   }
   return { raw, data: null as any };
 }
+
+// =========================================================
+// 🎨 [중요] 메인 페이지 컴포넌트
+// =========================================================
 
 export default function Page() {
   const [assetType, setAssetType] = useState<AssetType>("stock");
@@ -574,38 +573,36 @@ export default function Page() {
   };
 
   // =========================================================
-  // 🎨 [중요] 렌더링 섹션 (원본 유지하며 메뉴 추가)
+  // 🎨 [중요] 렌더링 섹션 (상단 메뉴 크기 통일 완료)
   // =========================================================
 
   return (
-    <main style={{ maxWidth: 920, margin: "24px auto", padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
+    <main style={{ maxWidth: 920, margin: "24px auto", padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif", boxSizing: "border-box", overflowX: "hidden" }}>
       <AlertModal isOpen={isAlertOpen} message={alertMsg} onClose={() => setIsAlertOpen(false)} />
       <InputModal isOpen={isInputOpen} title="프리셋 이름 저장" placeholder="예: 내 단타 규칙" onConfirm={handlePresetSaveConfirm} onCancel={() => setIsInputOpen(false)} />
 
-      {/* 🚀 대표님이 요청하신 서비스 선택 메뉴 (원본 100% 보존하며 상단에 삽입) */}
+      {/* 🚀 서비스 선택 메뉴: 심층 분석 페이지 박스 크기와 완벽 통일 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 30 }}>
         <button 
           onClick={() => window.location.href = '/'}
           style={{ 
-            padding: "20px 16px", borderRadius: 16, border: "2px solid #2563eb", 
+            padding: "16px 12px", borderRadius: 16, border: "2px solid #2563eb", 
             background: "#eff6ff", cursor: "pointer", textAlign: "left", transition: "0.2s"
           }}
         >
-          <div style={{ fontSize: 24, marginBottom: 8 }}>📝</div>
-          <div style={{ fontWeight: 900, color: "#2563eb", fontSize: 16 }}>매매 복기</div>
-          <div style={{ fontSize: 12, color: "#3b82f6", marginTop: 4, fontWeight: 700 }}>원칙 점검 및 기록</div>
+          <div style={{ fontSize: 20, marginBottom: 4 }}>📝</div>
+          <div style={{ fontWeight: 900, color: "#2563eb", fontSize: 14 }}>매매 복기</div>
         </button>
 
         <button 
           onClick={() => window.location.href = '/upgrade'}
           style={{ 
-            padding: "20px 16px", borderRadius: 16, border: "1px solid #e5e7eb", 
+            padding: "16px 12px", borderRadius: 16, border: "1px solid #e5e7eb", 
             background: "#ffffff", cursor: "pointer", textAlign: "left", transition: "0.2s"
           }}
         >
-          <div style={{ fontSize: 24, marginBottom: 8 }}>🔍</div>
-          <div style={{ fontWeight: 900, color: "#111827", fontSize: 16 }}>심층 분석</div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, fontWeight: 700 }}>스캔 및 고수 비교</div>
+          <div style={{ fontSize: 20, marginBottom: 4 }}>🔍</div>
+          <div style={{ fontWeight: 900, color: "#111827", fontSize: 14 }}>심층 분석</div>
         </button>
       </div>
 
@@ -630,10 +627,10 @@ export default function Page() {
           <div style={{ display: "flex", gap: 10, margin: "14px 0 18px", flexWrap: "wrap" }}>{(["long", "swing", "day", "etf"] as TradeType[]).map(tabBtn)}</div>
           <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 18, background: "white" }}>
             <div style={{ display: "grid", gap: 12 }}>
-              <label style={{ fontWeight: 800 }}>종목/티커 (검색어)<input value={ticker} onChange={(e) => setTicker(clampTicker(e.target.value))} placeholder="예: 애플 / AAPL / 삼성전자" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none" }} /></label>
-              <label style={{ fontWeight: 800 }}>진입가 <span style={{ fontWeight: 700, color: "#ef4444" }}>(필수)</span><input type="number" value={entryPrice} onChange={(e) => setEntryPrice(Number(e.target.value))} placeholder="예: 100.5" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none" }} /></label>
-              <label style={{ fontWeight: 800 }}>손절가 <input type="number" value={stopLoss} onChange={(e) => setStopLoss(e.target.value === "" ? "" : Number(e.target.value))} placeholder="예: 92.5" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none" }} /></label>
-              <label style={{ fontWeight: 800 }}>메모(왜 이 매매를 했는지 상세 기록) — {TAB_LABEL[tradeType]}<textarea value={reasonNote} placeholder={NOTE_TEMPLATES[tradeType]} onChange={(e) => setReasonNote(e.target.value)} style={{ width: "100%", padding: 12, minHeight: 170, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", lineHeight: 1.5 }} /></label>
+              <label style={{ fontWeight: 800 }}>종목/티커 (검색어)<input value={ticker} onChange={(e) => setTicker(clampTicker(e.target.value))} placeholder="예: 애플 / AAPL / 삼성전자" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", background: "white", color: "black", boxSizing: "border-box" }} /></label>
+              <label style={{ fontWeight: 800 }}>진입가 <span style={{ fontWeight: 700, color: "#ef4444" }}>(필수)</span><input type="number" value={entryPrice} onChange={(e) => setEntryPrice(Number(e.target.value))} placeholder="예: 100.5" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", background: "white", color: "black", boxSizing: "border-box" }} /></label>
+              <label style={{ fontWeight: 800 }}>손절가 <input type="number" value={stopLoss} onChange={(e) => setStopLoss(e.target.value === "" ? "" : Number(e.target.value))} placeholder="예: 92.5" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", background: "white", color: "black", boxSizing: "border-box" }} /></label>
+              <label style={{ fontWeight: 800 }}>메모(왜 이 매매를 했는지 상세 기록) — {TAB_LABEL[tradeType]}<textarea value={reasonNote} placeholder={NOTE_TEMPLATES[tradeType]} onChange={(e) => setReasonNote(e.target.value)} style={{ width: "100%", padding: 12, minHeight: 170, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", lineHeight: 1.5, background: "white", color: "black", boxSizing: "border-box" }} /></label>
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", borderRadius: 12, border: "1px solid #e5e7eb", background: "#fafafa" }}>
                 <div style={{ fontWeight: 900, color: "#111827", fontSize: 13 }}>{rulesCheckedOnce[tradeType] ? "✅ 규칙 체크 완료(1회)" : "⚠️ 규칙 체크 필수(AI 생성 전 1회)"}</div>
@@ -656,7 +653,7 @@ export default function Page() {
                           <label style={{ display: "flex", gap: 10, alignItems: "center", cursor: "pointer" }}><input type="checkbox" checked={c.checked} onChange={() => toggleChecklist(c.id)} /><span style={{ fontWeight: 900, color: "#111827" }}>{c.checked ? "완료" : "미완료"}</span></label>
                           <button onClick={() => removeChecklistItem(c.id)} style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>삭제</button>
                         </div>
-                        <input value={c.text} onChange={(e) => editChecklistText(c.id, e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none", background: "white", fontWeight: 700 }} />
+                        <input value={c.text} onChange={(e) => editChecklistText(c.id, e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none", background: "white", fontWeight: 700, color: "black", boxSizing: "border-box" }} />
                       </div>
                     ))}
                   </div>
@@ -677,10 +674,10 @@ export default function Page() {
                     {presets.map((p) => (
                       <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <div style={{ fontWeight: 900 }}>{p.name}</div>
+                          <div style={{ fontWeight: 900, color: "black" }}>{p.name}</div>
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => applyPreset(p)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #111827", background: "white", fontWeight: 700 }}>적용</button>
-                            <button onClick={() => deletePreset(p.id)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ef4444", color: "#ef4444", background: "white", fontWeight: 700 }}>삭제</button>
+                            <button onClick={() => applyPreset(p)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #111827", background: "white", fontWeight: 700, cursor: "pointer" }}>적용</button>
+                            <button onClick={() => deletePreset(p.id)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ef4444", color: "#ef4444", background: "white", fontWeight: 700, cursor: "pointer" }}>삭제</button>
                           </div>
                         </div>
                       </div>
@@ -691,8 +688,8 @@ export default function Page() {
 
               {/* 가이드 & 액션 버튼 */}
               <div style={{ display: "grid", gap: 10, padding: 12, borderRadius: 12, border: "1px dashed #e5e7eb", background: "#fafafa" }}>
-                <div style={{ fontWeight: 900 }}>가이드: {TAB_LABEL[tradeType]}</div>
-                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, fontFamily: "inherit" }}>{NOTE_TEMPLATES[tradeType]}</pre>
+                <div style={{ fontWeight: 900, color: "black" }}>가이드: {TAB_LABEL[tradeType]}</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, fontFamily: "inherit", color: "#374151" }}>{NOTE_TEMPLATES[tradeType]}</pre>
               </div>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -704,7 +701,7 @@ export default function Page() {
 
               {checkOpen && checkResult && (
                 <div style={{ marginTop: 12, border: "1px solid #e5e7eb", borderRadius: 14, padding: 12, background: "#ffffff" }}>
-                  <div style={{ fontWeight: 900, marginBottom: 8 }}>{checkResult.title}</div>
+                  <div style={{ fontWeight: 900, marginBottom: 8, color: "black" }}>{checkResult.title}</div>
                   <div style={{ display: "grid", gap: 8 }}>
                     {checkResult.items.map((it, idx) => (
                       <div key={idx} style={{ fontSize: 13, color: it.ok ? "#059669" : "#dc2626" }}>{it.ok ? "✅" : "⚠️"} {it.label}</div>
@@ -718,25 +715,25 @@ export default function Page() {
           {/* 결과 섹션 */}
           {result && (
             <section style={{ marginTop: 18, border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>AI 분석 결과</h2>
-              <pre style={{ whiteSpace: "pre-wrap", marginTop: 10, lineHeight: 1.6, fontSize: 13, color: "#111827" }}>{result}</pre>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: "black" }}>AI 분석 결과</h2>
+              <pre style={{ whiteSpace: "pre-wrap", marginTop: 10, lineHeight: 1.6, fontSize: 13, color: "#111827", fontFamily: "inherit" }}>{result}</pre>
             </section>
           )}
 
           {/* 히스토리 섹션 */}
           <section style={{ marginTop: 18, border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 저장된 복기</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: "black" }}>최근 저장된 복기</h2>
               <button onClick={clearHistoryAll} style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>전체 삭제</button>
             </div>
             <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
               {history.map((h) => (
                 <div key={h.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <div style={{ fontWeight: 900 }}>[{TAB_LABEL[h.tradeType]}] {h.ticker}</div>
+                    <div style={{ fontWeight: 900, color: "black" }}>[{TAB_LABEL[h.tradeType]}] {h.ticker}</div>
                     <div style={{ fontSize: 11, color: "#6b7280" }}>{formatDateTime(h.createdAt)}</div>
                   </div>
-                  <button onClick={() => loadHistoryItem(h)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900 }}>불러오기</button>
+                  <button onClick={() => loadHistoryItem(h)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }}>불러오기</button>
                 </div>
               ))}
             </div>

@@ -178,7 +178,18 @@ export default function UpgradePage() {
             {isManual && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {["per", "roe", "pbr", "psr"].map((k) => (
-                  <input key={k} placeholder={k.toUpperCase()} type="number" style={{ padding: "10px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} value={(manualData as any)[k]} onChange={e => setManualData({...manualData, [k]: e.target.value})} />
+                  <div key={k} style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                    <input 
+                      placeholder={k.toUpperCase()} 
+                      type="number" 
+                      style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} 
+                      value={(manualData as any)[k]} 
+                      onChange={e => setManualData({...manualData, [k]: e.target.value})} 
+                    />
+                    <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>
+                      {(k === "per" || k === "pbr") ? "배" : "%"}
+                    </span>
+                  </div>
                 ))}
               </div>
             )}
