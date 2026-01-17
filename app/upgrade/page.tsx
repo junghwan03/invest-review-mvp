@@ -31,10 +31,17 @@ const LIMIT_KEY = "daily_upgrade_limit_v1";
 const HISTORY_KEY = "analysis_history_v1";
 const FREE_HISTORY_LIMIT = 10;
 
-// 날짜 포맷 헬퍼
+// 유틸리티 함수
 function formatDateTime(ts: number) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+async function copyText(text: string) {
+  if (navigator?.clipboard?.writeText) { await navigator.clipboard.writeText(text); return; }
+  const ta = document.createElement("textarea"); ta.value = text;
+  ta.style.position = "fixed"; ta.style.left = "-9999px"; ta.style.top = "0";
+  document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
 }
 
 export default function UpgradePage() {
@@ -79,28 +86,18 @@ export default function UpgradePage() {
   };
 
   const loadHistoryItem = (h: any) => {
-    setMode(h.mode);
-    setTicker(h.ticker || "");
-    setResult(h.result);
-    setMatchingResult(h.matchingResult || null);
-    if (h.manualData) {
-      setIsManual(true);
-      setManualData(h.manualData);
-    }
+    setMode(h.mode); setTicker(h.ticker || ""); setResult(h.result); setMatchingResult(h.matchingResult || null);
+    if (h.manualData) { setIsManual(true); setManualData(h.manualData); }
     if (h.portfolio) setPortfolio(h.portfolio);
     showAlert("이전 기록을 불러왔습니다.");
   };
 
-  const clearHistoryAll = () => {
-    setHistory([]);
-    localStorage.removeItem(HISTORY_KEY);
-  };
+  const clearHistoryAll = () => { setHistory([]); localStorage.removeItem(HISTORY_KEY); };
 
   const handleVisionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setVisionLoading(true);
-    setUploadStatus("AI 분석 중...");
+    setVisionLoading(true); setUploadStatus("AI 분석 중...");
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
@@ -108,8 +105,7 @@ export default function UpgradePage() {
       setPreviewUrl(base64Full);
       try {
         const res = await fetch("https://invest-review-mvp.vercel.app/api/ai/upgrade", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "vision", imageBase64: base64Full.split(",")[1] }),
         });
         const data = await res.json();
@@ -118,17 +114,27 @@ export default function UpgradePage() {
         if (item) {
           setUploadStatus("✅ 자동 입력 완료!");
           if (item.weight && item.weight !== "N/A") {
-            setMode("portfolio");
-            setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
+            setMode("portfolio"); setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
           } else {
-            setMode("single");
-            setTicker(item.ticker);
-            setIsManual(true);
+            setMode("single"); setTicker(item.ticker); setIsManual(true);
             setManualData({ per: item.per || "", roe: item.roe || "", pbr: item.pbr || "", psr: item.psr || "" });
           }
         }
       } catch { setUploadStatus("❌ 분석 실패"); } finally { setVisionLoading(false); }
     };
+  };
+
+  const onShareOrCopy = async () => {
+    if (!result) return;
+    const shareTitle = `AI 투자 심층 분석 - ${ticker || "포트폴리오"}`;
+    const shareText = `[AI 투자 심층 분석 리포트]\n\n종목: ${ticker || "포트폴리오"}\n\n${result}`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try { await navigator.share({ title: shareTitle, text: shareText }); return; } catch (err) { console.log("공유 취소됨"); }
+    }
+    try {
+      await copyText(shareText);
+      showAlert("분석 내용이 복사되었습니다.\n메모장이나 카톡에 붙여넣기 해주세요!");
+    } catch { showAlert("복사에 실패했습니다. 직접 복사해주세요."); }
   };
 
   const handleSubmit = async () => {
@@ -155,16 +161,9 @@ export default function UpgradePage() {
         setMatchingResult(currentMatch);
       }
 
-      // 히스토리에 저장
       saveToHistory({
-        id: Date.now(),
-        createdAt: Date.now(),
-        mode,
-        ticker: mode === "single" ? ticker : `${portfolio.length}개 종목`,
-        result: content,
-        manualData: mode === "single" ? manualData : null,
-        portfolio: mode === "portfolio" ? portfolio : null,
-        matchingResult: currentMatch
+        id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker : `${portfolio.length}개 종목`,
+        result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch
       });
 
       const nextCount = (usage.date === today ? usage.count : 0) + 1;
@@ -189,6 +188,7 @@ export default function UpgradePage() {
       </div>
 
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>AI 투자 심층 분석</h1>
+      <p style={{ color: "#6b7280", marginTop: 0, fontSize: 13 }}>종목/포트폴리오 정밀 진단. (무료: 최근 {FREE_HISTORY_LIMIT}개 오프라인 저장)</p>
       <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 20 }}>
         오늘 무료 사용: {DAILY_LIMIT - remaining} / {DAILY_LIMIT} (남은 횟수: {remaining})
       </div>
@@ -203,11 +203,9 @@ export default function UpgradePage() {
               </div>
             ) : (
               <>
-                <img src={previewUrl} style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #2563eb" }} />
+                <img src={previewUrl} style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }} />
                 {visionLoading && (
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.7)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
-                    ⏳
-                  </div>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.7)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⏳</div>
                 )}
               </>
             )}
@@ -215,9 +213,7 @@ export default function UpgradePage() {
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} />
         </label>
         {uploadStatus && (
-          <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>
-            {uploadStatus}
-          </div>
+          <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>
         )}
       </section>
 
@@ -239,9 +235,7 @@ export default function UpgradePage() {
                 {["per", "roe", "pbr", "psr"].map((k) => (
                   <div key={k} style={{ position: "relative", display: "flex", alignItems: "center" }}>
                     <input placeholder={k.toUpperCase()} type="number" style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} value={(manualData as any)[k]} onChange={e => setManualData({...manualData, [k]: e.target.value})} />
-                    <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>
-                      {(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}
-                    </span>
+                    <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>{(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}</span>
                   </div>
                 ))}
               </div>
@@ -273,9 +267,12 @@ export default function UpgradePage() {
         )}
       </section>
 
-      <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16, cursor: "pointer", marginBottom: 12 }}>
-        {loading ? "AI 분석 중..." : "분석 시작하기"}
-      </button>
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <button onClick={handleSubmit} disabled={loading} style={{ flex: 1, padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16, cursor: "pointer" }}>
+          {loading ? "AI 분석 중..." : "분석 시작하기"}
+        </button>
+        <button onClick={onShareOrCopy} disabled={!result} style={{ padding: "16px", borderRadius: 16, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }}>📤 공유</button>
+      </div>
 
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
@@ -295,7 +292,6 @@ export default function UpgradePage() {
         </section>
       )}
 
-      {/* 📜 심층 분석 히스토리 섹션 추가 */}
       <section style={{ marginTop: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 심층 분석 기록</h2>
@@ -304,15 +300,10 @@ export default function UpgradePage() {
         <div style={{ display: "grid", gap: 10 }}>
           {history.length > 0 ? history.map((h) => (
             <div key={h.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontWeight: 900, fontSize: 14 }}>{h.ticker}</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>{formatDateTime(h.createdAt)}</div>
-              </div>
+              <div><div style={{ fontWeight: 900, fontSize: 14 }}>{h.ticker}</div><div style={{ fontSize: 11, color: "#6b7280" }}>{formatDateTime(h.createdAt)}</div></div>
               <button onClick={() => loadHistoryItem(h)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, fontSize: 12, cursor: "pointer" }}>불러오기</button>
             </div>
-          )) : (
-            <div style={{ textAlign: "center", padding: "20px 0", color: "#9ca3af", fontSize: 13 }}>저장된 분석 기록이 없습니다.</div>
-          )}
+          )) : <div style={{ textAlign: "center", padding: "20px 0", color: "#9ca3af", fontSize: 13 }}>저장된 분석 기록이 없습니다.</div>}
         </div>
       </section>
 
