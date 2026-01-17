@@ -3,19 +3,20 @@ import { headers } from "next/headers";
 
 export const runtime = "nodejs";
 
-// 🌐 [CORS 설정] 토스 앱에서 Vercel 백엔드로 접속할 수 있게 허용하는 헤더
+// 🌐 [보강] 토스 미니앱 인프라 대응 강력한 CORS 헤더
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*", // 모든 도메인 허용 (토스 미니앱 환경 대응)
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+  "Access-Control-Max-Age": "86400", // 사전 점검 결과를 하루 동안 유지하여 간헐적 차단 방지
 };
 
-// 🛡️ [OPTIONS 처리] 브라우저의 사전 보안 점검(Preflight) 요청 대응
+// 🛡️ [최적화] 사전 보안 점검 응답 속도 극대화
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+  return new Response(null, { status: 204, headers: corsHeaders });
 }
 
-// 🏆 [1. 횟수 제한 설정 - 매매 복기와 동일하게 일일 3회]
+// 🏆 [1. 횟수 제한 설정]
 const DAILY_FREE_LIMIT = 3;
 const USAGE_STORE: Record<string, { count: number; lastReset: string }> = {};
 
@@ -28,7 +29,7 @@ const MASTER_FUNDAMENTALS: Record<string, any> = {
   "000660": { per: 15.2, roe: 12.5, pbr: 1.85, psr: 2.1, cap: "140T KRW" }
 };
 
-// 🏆 [3. 마스터 데이터베이스: 6인의 고수 포트폴리오]
+// 🏆 [3. 마스터 데이터베이스: 고수 포트폴리오]
 const EXPERT_PORTFOLIOS: Record<string, any> = {
   "warren_buffett": {
     name: "워런 버핏 (가치투자)",
@@ -67,7 +68,6 @@ async function getLivePrice(ticker: string) {
   try {
     const isDomestic = /^[0-9]+$/.test(ticker);
     const symbol = isDomestic ? ticker : (ticker.includes(".") ? ticker : `${ticker}.O`);
-    
     const url = isDomestic 
       ? `https://m.stock.naver.com/api/stock/${symbol}/basic`
       : `https://api.stock.naver.com/stock/${symbol}/basic`;
@@ -97,7 +97,6 @@ export async function POST(req: Request) {
     const ip = (headerList.get("x-forwarded-for") ?? "127.0.0.1").split(',')[0];
     const today = new Date().toISOString().split("T")[0];
 
-    // --- 5. 일일 사용 횟수 제한 체크 ---
     if (!USAGE_STORE[ip] || USAGE_STORE[ip].lastReset !== today) {
       USAGE_STORE[ip] = { count: 0, lastReset: today };
     }
@@ -116,23 +115,22 @@ export async function POST(req: Request) {
     let systemMsg = "";
     let userPrompt: any = "";
 
-    // --- 6. 모드별 분석 로직 분기 ---
-
-    // 📸 [추가] 모드 C: 스크린샷 이미지 분석 (Vision)
+    // 📸 [모드 C: 스크린샷 이미지 분석 고도화]
     if (type === "vision" && imageBase64) {
-      systemMsg = "너는 주식 앱 스크린샷 전문 데이터 분석가다. 이미지에서 투자 정보를 추출해라.";
+      systemMsg = `너는 증권사 앱 스크린샷 판독 전문가다. 이미지에서 지표를 추출해라. 
+      [판독 가이드]
+      1. '배' 또는 'x'가 붙은 숫자는 PER, PBR, PSR 수치다.
+      2. '%'가 붙은 숫자는 ROE 수치다. 
+      3. 숫자가 'N/A'이더라도 주변 텍스트와 레이아웃을 보고 가장 적절한 지표값을 찾아내라.
+      4. 한국어 종목명과 티커를 모두 지원한다.
+      5. 출력은 반드시 순수 JSON만 해라.`;
+
       userPrompt = [
         {
           type: "text",
-          text: `이 이미지(주식 계좌 또는 종목 상세 화면)에서 다음 데이터를 추출하여 JSON 형식으로만 응답해라:
-          1. 종목명(또는 티커)
-          2. 비중(%) - 계좌 화면인 경우
-          3. PER, ROE, PBR, PSR 수치 - 종목 상세 화면인 경우
-          
-          [주의] 
-          - 데이터가 없는 항목은 "N/A"로 채울 것.
-          - 오직 JSON 객체(또는 리스트)만 반환할 것. 다른 텍스트는 금지한다.
-          - 형식: { "extracted": [ { "ticker": "...", "weight": "...", "per": "...", "roe": "...", "pbr": "...", "psr": "..." } ] }`
+          text: `이미지에서 다음 데이터를 추출하여 JSON 형식으로 응답해라:
+          { "extracted": [ { "ticker": "종목명", "weight": "비중(숫자만)", "per": "PER값", "roe": "ROE값", "pbr": "PBR값", "psr": "PSR값" } ] }
+          수치를 못 찾으면 "N/A" 대신 이미지 내의 가장 근접한 숫자라도 적어라.`
         },
         {
           type: "image_url",
@@ -143,21 +141,8 @@ export async function POST(req: Request) {
     // [모드 A: 고수 포트폴리오 비교]
     else if (type === "comparison" || portfolio) {
       const expert = EXPERT_PORTFOLIOS[expertId] || EXPERT_PORTFOLIOS["warren_buffett"];
-      systemMsg = "너는 세계적인 자산 운용가이자 투자 성향 분석가다. 냉철하고 전문적인 톤을 유지해라. 투자 제안(매수/매도)을 절대 하지 말고 데이터 기반의 상태 분석만 제공해라.";
-      userPrompt = `
-      사용자의 포트폴리오를 고수 '${expert.name}'의 전략과 비교 분석해라.
-      
-      [데이터]
-      - 사용자 포트폴리오: ${JSON.stringify(portfolio)}
-      - 고수(${expert.name}) 섹터 비중: ${JSON.stringify(expert.sectors)}
-      - 고수 전략 설명: ${expert.description}
-      
-      [분석 가이드 및 규칙]
-      1. 리포트 최상단에 이 사용자의 투자 스타일을 8자 내외의 멋진 수식어로 정의해라. (예: "냉철한 가치투자자", "공격적 성장주 사냥꾼")
-      2. 답변 본문은 "### 📊 포트폴리오 진단 결과"로 시작해라.
-      3. 사용자의 종목들을 섹터별로 분류하여 비중을 계산하고 고수의 비중과 대조해라.
-      4. 어느 부분이 과잉이고 부족한지, 고수의 철학에 비추어 볼 때 보완해야 할 점을 조언해라.
-      `;
+      systemMsg = "너는 세계적인 자산 운용가다. 냉철하고 전문적인 톤을 유지해라. 투자 제안이 아닌 데이터 기반 분석만 제공해라.";
+      userPrompt = `사용자 포트폴리오를 고수 '${expert.name}'의 전략과 비교 분석해라.\n\n- 사용자: ${JSON.stringify(portfolio)}\n- 고수 섹터: ${JSON.stringify(expert.sectors)}\n- 전략: ${expert.description}\n\n최상단에 8자 내외 수식어로 스타일을 정의하고 '### 📊 포트폴리오 진단 결과'로 시작해라.`;
     } 
     // [모드 B: 단일 종목 심층 분석]
     else {
@@ -177,23 +162,10 @@ export async function POST(req: Request) {
         psr: manualPsr || dbFund?.psr || "N/A"
       };
       
-      systemMsg = "너는 대한민국 최고의 퀀트 분석가다. 냉철하고 전문적인 수석 분석가 톤을 유지해라. 오직 시장의 객관적 상태와 데이터 분석만 제공하고 직접적인 투자 행동 제안은 절대 하지 마라.";
-      userPrompt = `
-      [실시간 데이터]
-      - 종목명: ${live?.name || userInput}
-      - 현재가: ${live?.price} ${live?.currency}
-      - 지표: PER ${finalData.per}배 | ROE ${finalData.roe}% | PBR ${finalData.pbr}배 | PSR ${finalData.psr}배
-      
-      [출력 규칙]
-      1. 답변 최상단은 반드시 "### 📈 ${live?.name || userInput} | 현재가: ${live?.price} ${live?.currency}" 형식으로 한 줄 출력해라.
-      2. 그 아래에 "**PER**: ${finalData.per}배 | **ROE**: ${finalData.roe}% | **PBR**: ${finalData.pbr}배 | **PSR**: ${finalData.psr}배"를 출력해라.
-      3. **'## 🌐 산업 사이클 분석'** 섹션을 반드시 포함하여 현재 어느 단계(도입-성장-성숙-쇠퇴)인지 분석해라.
-      4. **'## 🎯 종합 결론'**과 **'## 🔍 상세 지표 분석'**을 작성해라.
-      5. 절대 표(Table) 형식을 사용하지 마라.
-      `;
+      systemMsg = "너는 대한민국 최고의 퀀트 분석가다. 냉철하고 전문적인 톤으로 데이터 분석만 제공해라.";
+      userPrompt = `[데이터]\n종목: ${live?.name || userInput}\n현재가: ${live?.price} ${live?.currency}\n지표: PER ${finalData.per}배 | ROE ${finalData.roe}% | PBR ${finalData.pbr}배 | PSR ${finalData.psr}배\n\n'### 📈 종목명 | 현재가' 형식으로 시작하고 '## 🌐 산업 사이클 분석'과 '## 🎯 종합 결론'을 포함해라.`;
     }
 
-    // --- 7. OpenAI API 호출 ---
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -201,15 +173,13 @@ export async function POST(req: Request) {
         model: "gpt-4o-mini", 
         messages: [{ role: "system", content: systemMsg }, { role: "user", content: userPrompt }],
         max_tokens: 1000,
+        temperature: 0, // 🎯 추출 정확도를 위해 일관성 극대화
       }),
     });
 
     const data = await res.json();
-    
-    // 호출 성공 시 카운트 증가
     USAGE_STORE[ip].count += 1;
 
-    // --- 8. Page.tsx와 완벽 호환되는 데이터 반환 (CORS 헤더 포함) ---
     return NextResponse.json({ 
       content: data.choices[0].message.content,
       remaining: DAILY_FREE_LIMIT - USAGE_STORE[ip].count 
