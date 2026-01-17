@@ -34,7 +34,6 @@ export default function UpgradePage() {
   const [mode, setMode] = useState<"single" | "portfolio">("single");
   const [loading, setLoading] = useState(false);
   const [visionLoading, setVisionLoading] = useState(false);
-  const [imgLoading, setImgLoading] = useState(false);
   const [result, setResult] = useState("");
   const [remaining, setRemaining] = useState<number>(DAILY_LIMIT);
   const [alertMsg, setAlertMsg] = useState("");
@@ -49,7 +48,6 @@ export default function UpgradePage() {
   const [portfolio, setPortfolio] = useState<{ ticker: string; weight: number }[]>([]);
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
   const [selectedExpert, setSelectedExpert] = useState("warren_buffett");
-  const [history, setHistory] = useState<any[]>([]);
   const matchingCardRef = useRef<HTMLDivElement>(null);
 
   const showAlert = (msg: string) => { setAlertMsg(msg); setIsAlertOpen(true); };
@@ -62,8 +60,6 @@ export default function UpgradePage() {
       const parsed = JSON.parse(rawLimit);
       setRemaining(parsed.date === today ? Math.max(0, DAILY_LIMIT - parsed.count) : DAILY_LIMIT);
     }
-    const rawHistory = localStorage.getItem(HISTORY_KEY);
-    if (rawHistory) setHistory(JSON.parse(rawHistory));
   }, []);
 
   const handleVisionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,7 +82,7 @@ export default function UpgradePage() {
         const parsed = JSON.parse(data.content.replace(/```json|```/g, ""));
         const item = parsed.extracted?.[0];
         if (item) {
-          setUploadStatus("✅ 성공!");
+          setUploadStatus("✅ 자동 입력 완료!");
           if (item.weight && item.weight !== "N/A") {
             setMode("portfolio");
             setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
@@ -97,7 +93,7 @@ export default function UpgradePage() {
             setManualData({ per: item.per || "", roe: item.roe || "", pbr: item.pbr || "", psr: item.psr || "" });
           }
         }
-      } catch { setUploadStatus("❌ 실패"); } finally { setVisionLoading(false); }
+      } catch { setUploadStatus("❌ 분석 실패"); } finally { setVisionLoading(false); }
     };
   };
 
@@ -115,8 +111,7 @@ export default function UpgradePage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      const content = data.content || data;
-      setResult(content);
+      setResult(data.content || data);
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
         setMatchingResult({ styleName: "전략적 투자자", expertName: sel?.name, matchRate: Math.floor(Math.random() * 15) + 82, emoji: sel?.emoji });
@@ -131,7 +126,6 @@ export default function UpgradePage() {
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "16px", boxSizing: "border-box", overflowX: "hidden" }}>
       <AlertModal isOpen={isAlertOpen} message={alertMsg} onClose={() => setIsAlertOpen(false)} />
 
-      {/* 🚀 상단 서비스 스위처 (복기 페이지와 동일) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
         <button onClick={() => window.location.href = '/'} style={{ padding: "16px 12px", borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff", textAlign: "left" }}>
           <div style={{ fontSize: 20 }}>📝</div>
@@ -148,19 +142,35 @@ export default function UpgradePage() {
         오늘 무료 사용: {DAILY_LIMIT - remaining} / {DAILY_LIMIT} (남은 횟수: {remaining})
       </div>
 
-      {/* 📸 Vision 카드 (크기 대폭 축소) */}
-      <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center" }}>
-        <label style={{ cursor: "pointer" }}>
-          {!previewUrl ? (
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#2563eb" }}>{visionLoading ? "⏳ 분석 중..." : "📸 스크린샷 자동 입력"}</div>
-          ) : (
-            <img src={previewUrl} style={{ width: 60, height: 80, objectFit: "cover", borderRadius: 8, border: "1px solid #2563eb" }} />
-          )}
+      {/* 📸 Vision 카드 (모래시계 로직 추가) */}
+      <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center", position: "relative" }}>
+        <label style={{ cursor: "pointer", display: "block" }}>
+          <div style={{ position: "relative", width: "fit-content", margin: "0 auto" }}>
+            {!previewUrl ? (
+              <div style={{ padding: "20px 0" }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>📸</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#2563eb" }}>스크린샷 자동 입력</div>
+              </div>
+            ) : (
+              <>
+                <img src={previewUrl} style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }} />
+                {visionLoading && (
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.7)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                    ⏳
+                  </div>
+                )}
+              </>
+            )}
+          </div>
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} />
         </label>
+        {uploadStatus && (
+          <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>
+            {uploadStatus}
+          </div>
+        )}
       </section>
 
-      {/* 모드 전환 */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["single", "portfolio"].map((m) => (
           <button key={m} onClick={() => setMode(m as any)} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: mode === m ? "#111827" : "#fff", color: mode === m ? "#fff" : "#111827", fontWeight: 800, fontSize: 13 }}>
@@ -169,7 +179,6 @@ export default function UpgradePage() {
         ))}
       </div>
 
-      {/* 입력 섹션 (박스 여백 줄임) */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", marginBottom: 20 }}>
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
@@ -224,7 +233,6 @@ export default function UpgradePage() {
         {loading ? "AI 분석 중..." : "분석 시작하기"}
       </button>
 
-      {/* 결과 섹션 (박스 크기 조절) */}
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", letterSpacing: 2, marginBottom: 8 }}>MATCH REPORT</div>
