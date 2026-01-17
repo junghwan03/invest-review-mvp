@@ -21,12 +21,11 @@ const HISTORY_KEY = "analysis_history_v1";
 export default function UpgradePage() {
   const [mode, setMode] = useState<"single" | "portfolio">("single");
   const [loading, setLoading] = useState(false);
-  const [visionLoading, setVisionLoading] = useState(false); // 📸 스캔 로딩 상태
+  const [visionLoading, setVisionLoading] = useState(false); 
   const [imgLoading, setImgLoading] = useState(false);
   const [result, setResult] = useState("");
   const [remaining, setRemaining] = useState<number | null>(null);
 
-  // --- [업로드 상태 및 미리보기 전용 상태] ---
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>(""); 
 
@@ -34,19 +33,15 @@ export default function UpgradePage() {
     styleName: string; expertName: string; matchRate: number; emoji: string;
   } | null>(null);
 
-  // --- [상태 1: 단일 종목 분석] ---
   const [ticker, setTicker] = useState("");
   const [isManual, setIsManual] = useState(false);
   const [manualData, setManualData] = useState({ per: "", roe: "", pbr: "", psr: "" });
 
-  // --- [상태 2: 포트폴리오 비교] ---
   const [portfolio, setPortfolio] = useState<{ ticker: string; weight: number }[]>([]);
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
   const [selectedExpert, setSelectedExpert] = useState("warren_buffett");
 
-  // --- [상태 3: 히스토리] ---
   const [history, setHistory] = useState<any[]>([]);
-
   const matchingCardRef = useRef<HTMLDivElement>(null);
 
   const getTodayKey = () => {
@@ -67,7 +62,6 @@ export default function UpgradePage() {
     if (rawHistory) setHistory(JSON.parse(rawHistory));
   }, []);
 
-  // 📸 스크린샷 분석 함수
   const handleVisionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -224,95 +218,105 @@ export default function UpgradePage() {
   };
 
   return (
-    <main style={{ width: "100%", maxWidth: "100vw", margin: "0 auto", padding: "16px", boxSizing: "border-box", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", minHeight: "100vh", overflowX: "hidden" }}>
+    <main style={{ 
+      maxWidth: 920, 
+      margin: "24px auto", 
+      padding: 16, 
+      boxSizing: "border-box", 
+      fontFamily: "system-ui, -apple-system, sans-serif", 
+      color: "#111827", 
+      minHeight: "100vh", 
+      overflowX: "hidden" // 가로 스크롤 완전 차단
+    }}>
       
-      {/* 🚀 서비스 스위처 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
-        <button onClick={() => window.location.href = '/'} style={{ padding: "16px 12px", borderRadius: "16px", border: "1px solid #e5e7eb", background: "#ffffff", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
-          <div style={{ fontSize: "20px", marginBottom: "4px" }}>📝</div>
-          <div style={{ fontWeight: "900", fontSize: "14px" }}>매매 복기</div>
+      {/* 🚀 서비스 스위처 (복기 페이지와 동일한 상단 마진) */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 30 }}>
+        <button onClick={() => window.location.href = '/'} style={{ padding: "20px 16px", borderRadius: 16, border: "1px solid #e5e7eb", background: "#ffffff", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>📝</div>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>매매 복기</div>
         </button>
-        <button onClick={() => window.location.href = '/upgrade'} style={{ padding: "16px 12px", borderRadius: "16px", border: "2px solid #2563eb", background: "#eff6ff", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
-          <div style={{ fontSize: "20px", marginBottom: "4px" }}>🔍</div>
-          <div style={{ fontWeight: "900", fontSize: "14px", color: "#2563eb" }}>심층 분석</div>
+        <button onClick={() => window.location.href = '/upgrade'} style={{ padding: "20px 16px", borderRadius: 16, border: "2px solid #2563eb", background: "#eff6ff", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>🔍</div>
+          <div style={{ fontWeight: 900, fontSize: 16, color: "#2563eb" }}>심층 분석</div>
         </button>
       </div>
 
       <div style={{ boxSizing: "border-box" }}>
-        <h1 style={{ fontSize: "22px", fontWeight: "900", marginBottom: "4px" }}> AI 투자 심층 분석 </h1>
-        <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "16px" }}>남은 횟수: {remaining ?? 3}회</div>
+        <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 6 }}> AI 투자 심층 분석 </h1>
+        <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 20 }}>오늘 남은 횟수: {remaining ?? 3}회</div>
       </div>
 
       {/* 📸 Vision 카드 */}
-      <section style={{ marginBottom: "20px", border: "1px solid #e5e7eb", borderRadius: "16px", padding: "20px 10px", background: "#ffffff", textAlign: "center", boxSizing: "border-box" }}>
+      <section style={{ marginBottom: 24, border: "1px solid #e5e7eb", borderRadius: 16, padding: "24px 12px", background: "#ffffff", textAlign: "center", boxSizing: "border-box" }}>
         <label style={{ cursor: "pointer", display: "block" }}>
           {!previewUrl ? (
             <>
-              <div style={{ fontSize: "32px", marginBottom: "8px" }}>{visionLoading ? "⏳" : "📸"}</div>
-              <div style={{ fontWeight: "900", color: "#2563eb", fontSize: "15px" }}>스크린샷 자동 입력</div>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>{visionLoading ? "⏳" : "📸"}</div>
+              <div style={{ fontWeight: 900, color: "#2563eb", fontSize: 18 }}>스크린샷 자동 입력</div>
             </>
           ) : (
-            <div style={{ position: "relative", width: "80px", height: "110px", margin: "0 auto 8px", borderRadius: "8px", overflow: "hidden", border: "2px solid #2563eb" }}>
+            <div style={{ position: "relative", width: "100px", height: "130px", margin: "0 auto 12px", borderRadius: 12, overflow: "hidden", border: "2px solid #2563eb" }}>
               <img src={previewUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Preview" />
             </div>
           )}
-          {uploadStatus && <div style={{ marginTop: "8px", fontWeight: "800", color: "#2563eb", fontSize: "12px" }}>{uploadStatus}</div>}
+          {uploadStatus && <div style={{ marginTop: 12, fontWeight: 800, color: "#2563eb", fontSize: 14 }}>{uploadStatus}</div>}
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} disabled={visionLoading} />
         </label>
       </section>
 
-      {/* 모드 전환 */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-        <button onClick={() => { setMode("single"); setResult(""); }} style={{ flex: 1, padding: "12px", borderRadius: "99px", border: "1px solid #e5e7eb", background: mode === "single" ? "#111827" : "white", color: mode === "single" ? "white" : "#111827", fontWeight: "900", fontSize: "13px" }}>🔍 종목 분석</button>
-        <button onClick={() => { setMode("portfolio"); setResult(""); }} style={{ flex: 1, padding: "12px", borderRadius: "99px", border: "1px solid #e5e7eb", background: mode === "portfolio" ? "#111827" : "white", color: mode === "portfolio" ? "white" : "#111827", fontWeight: "900", fontSize: "13px" }}>🏆 고수 비교</button>
+      {/* 모드 전환 탭 */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
+        <button onClick={() => { setMode("single"); setResult(""); }} style={{ flex: 1, padding: "14px", borderRadius: 999, border: "1px solid #e5e7eb", background: mode === "single" ? "#111827" : "white", color: mode === "single" ? "white" : "#111827", fontWeight: 900, fontSize: 14 }}>🔍 종목 분석</button>
+        <button onClick={() => { setMode("portfolio"); setResult(""); }} style={{ flex: 1, padding: "14px", borderRadius: 999, border: "1px solid #e5e7eb", background: mode === "portfolio" ? "#111827" : "white", color: mode === "portfolio" ? "white" : "#111827", fontWeight: 900, fontSize: 14 }}>🏆 고수 비교</button>
       </div>
 
-      {/* 입력 카드 */}
-      <section style={{ border: "1px solid #e5e7eb", borderRadius: "16px", padding: "16px", background: "white", marginBottom: "20px", boxSizing: "border-box" }}>
+      {/* 입력 카드 섹션 */}
+      <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 22, background: "white", marginBottom: 24, boxSizing: "border-box" }}>
         {mode === "single" ? (
-          <div style={{ display: "grid", gap: "14px" }}>
-            <label style={{ fontWeight: "800", fontSize: "13px" }}>분석할 종목명
-              <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="예: 삼성전자" style={{ width: "100%", padding: "12px", marginTop: "8px", borderRadius: "10px", border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none", fontWeight: "700" }} />
+          <div style={{ display: "grid", gap: 16 }}>
+            <label style={{ fontWeight: 800, fontSize: 15 }}>분석할 종목명
+              <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="예: 삼성전자" style={{ width: "100%", padding: 14, marginTop: 10, borderRadius: 12, border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none", fontWeight: 700 }} />
             </label>
-            <button onClick={() => setIsManual(!isManual)} style={{ fontSize: "12px", fontWeight: "900", color: "#6b7280", background: "none", border: "none", textDecoration: "underline", textAlign: "left" }}>
-              {isManual ? "✕ 수동 닫기" : "+ 지표 수동 입력"}
+            <button onClick={() => setIsManual(!isManual)} style={{ fontSize: 13, fontWeight: 900, color: "#6b7280", background: "none", border: "none", textDecoration: "underline", textAlign: "left", cursor: "pointer" }}>
+              {isManual ? "✕ 수동 입력창 닫기" : "+ 지표 수동 입력"}
             </button>
             {isManual && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 {["per", "roe", "pbr", "psr"].map((key) => (
                   <div key={key}>
-                    <div style={{ fontSize: "10px", fontWeight: "900", color: "#9ca3af", textTransform: "uppercase" }}>{key}</div>
-                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #e5e7eb", boxSizing: "border-box", fontWeight: "700" }} value={(manualData as any)[key]} onChange={e => setManualData({...manualData, [key]: e.target.value})} />
+                    <div style={{ fontSize: 11, fontWeight: 900, color: "#9ca3af", textTransform: "uppercase", marginBottom: 4 }}>{key}</div>
+                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #e5e7eb", boxSizing: "border-box", fontWeight: 700 }} value={(manualData as any)[key]} onChange={e => setManualData({...manualData, [key]: e.target.value})} />
                   </div>
                 ))}
               </div>
             )}
           </div>
         ) : (
-          <div style={{ display: "grid", gap: "16px" }}>
-            <div style={{ padding: "14px 10px", background: "#f9fafb", borderRadius: "12px", border: "1px solid #e5e7eb", boxSizing: "border-box" }}>
-              <div style={{ fontWeight: "900", marginBottom: "10px", fontSize: "13px", color: "#2563eb" }}>나의 포트폴리오</div>
-              <div style={{ display: "flex", gap: "6px", marginBottom: "10px", boxSizing: "border-box" }}>
-                <input placeholder="종목" style={{ flex: 2, minWidth: 0, padding: "10px", borderRadius: "8px", border: "1px solid #e5e7eb", boxSizing: "border-box" }} value={newStock.ticker} onChange={e => setNewStock({...newStock, ticker: e.target.value})} />
-                <input placeholder="%" style={{ flex: 1, minWidth: 0, padding: "10px", borderRadius: "8px", border: "1px solid #e5e7eb", boxSizing: "border-box" }} type="number" value={newStock.weight} onChange={e => setNewStock({...newStock, weight: e.target.value})} />
-                <button onClick={addStock} style={{ padding: "0 14px", background: "#2563eb", color: "white", borderRadius: "8px", border: "none", fontWeight: "900" }}>+</button>
+          <div style={{ display: "grid", gap: 24, width: "100%" }}>
+            <div style={{ padding: "20px 16px", background: "#f9fafb", borderRadius: 16, border: "1px solid #e5e7eb", boxSizing: "border-box" }}>
+              <div style={{ fontWeight: 900, marginBottom: 14, fontSize: 15, color: "#2563eb" }}>나의 포트폴리오</div>
+              <div style={{ display: "flex", gap: 10, marginBottom: 14, width: "100%", boxSizing: "border-box" }}>
+                <input placeholder="종목" style={{ flex: 2, minWidth: 0, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none" }} value={newStock.ticker} onChange={e => setNewStock({...newStock, ticker: e.target.value})} />
+                <input placeholder="%" style={{ flex: 1, minWidth: 0, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none" }} type="number" value={newStock.weight} onChange={e => setNewStock({...newStock, weight: e.target.value})} />
+                <button onClick={addStock} style={{ padding: "0 20px", background: "#2563eb", color: "white", borderRadius: 12, border: "none", fontWeight: 900, flexShrink: 0 }}>+</button>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {portfolio.map((s, i) => (
-                  <div key={i} style={{ padding: "6px 10px", background: "white", border: "1.5px solid #2563eb", color: "#2563eb", borderRadius: "99px", fontSize: "11px", fontWeight: "800", boxSizing: "border-box" }}>
-                    {s.ticker} {s.weight}% <span onClick={() => setPortfolio(portfolio.filter((_, idx) => idx !== i))} style={{ marginLeft: "3px", cursor: "pointer", color: "#ef4444" }}>✕</span>
+                  <div key={i} style={{ padding: "8px 14px", background: "white", border: "1.5px solid #2563eb", color: "#2563eb", borderRadius: 99, fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", boxSizing: "border-box" }}>
+                    {s.ticker} {s.weight}% <span onClick={() => setPortfolio(portfolio.filter((_, idx) => idx !== i))} style={{ marginLeft: 6, cursor: "pointer", color: "#ef4444", fontSize: 16 }}>✕</span>
                   </div>
                 ))}
               </div>
             </div>
-            <div style={{ boxSizing: "border-box" }}>
-              <div style={{ fontWeight: "900", marginBottom: "12px", fontSize: "14px" }}>비교할 투자 고수 선택</div>
-              {/* 🎯 [2x3 그리드] minmax(0, 1fr)로 요소 삐져나감 방지 */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", boxSizing: "border-box" }}>
+            
+            <div style={{ width: "100%", boxSizing: "border-box" }}>
+              <div style={{ fontWeight: 900, marginBottom: 16, fontSize: 15 }}>비교할 투자 고수 선택</div>
+              {/* 🎯 2/2/2 그리드: minmax(0, 1fr)로 버튼 너비 강제 수용 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, width: "100%", boxSizing: "border-box" }}>
                 {EXPERTS.map(exp => (
-                  <button key={exp.id} onClick={() => setSelectedExpert(exp.id)} style={{ padding: "12px 4px", borderRadius: "12px", border: selectedExpert === exp.id ? "2.5px solid #2563eb" : "1px solid #e5e7eb", background: selectedExpert === exp.id ? "#eff6ff" : "white", cursor: "pointer", boxSizing: "border-box", width: "100%" }}>
-                    <div style={{ fontSize: "22px", marginBottom: "2px" }}>{exp.emoji}</div>
-                    <div style={{ fontSize: "12px", fontWeight: "900", color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{exp.name}</div>
+                  <button key={exp.id} onClick={() => setSelectedExpert(exp.id)} style={{ padding: "20px 10px", borderRadius: 16, border: selectedExpert === exp.id ? "3px solid #2563eb" : "1px solid #e5e7eb", background: selectedExpert === exp.id ? "#eff6ff" : "white", cursor: "pointer", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", width: "100%", overflow: "hidden" }}>
+                    <div style={{ fontSize: 32, marginBottom: 6 }}>{exp.emoji}</div>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", textAlign: "center" }}>{exp.name}</div>
                   </button>
                 ))}
               </div>
@@ -321,68 +325,68 @@ export default function UpgradePage() {
         )}
       </section>
 
-      {/* 실행 버튼 세션 */}
-      <div style={{ display: "grid", gap: "8px", boxSizing: "border-box" }}>
-        <button onClick={handleSubmit} disabled={loading || (mode === 'single' && !ticker) || (mode === 'portfolio' && portfolio.length === 0)} style={{ padding: "18px", borderRadius: "16px", border: "none", background: loading ? "#93c5fd" : "#2563eb", color: "white", fontWeight: "900", fontSize: "16px", cursor: "pointer", boxSizing: "border-box" }}>
-          {loading ? "AI 분석 중..." : (mode === "single" ? "심층 분석 시작" : "고수와 비교하기")}
+      {/* 액션 버튼 세션 */}
+      <div style={{ display: "grid", gap: 12, boxSizing: "border-box" }}>
+        <button onClick={handleSubmit} disabled={loading || (mode === 'single' && !ticker) || (mode === 'portfolio' && portfolio.length === 0)} style={{ padding: "20px", borderRadius: 16, border: "none", background: loading ? "#93c5fd" : "#2563eb", color: "white", fontWeight: 900, fontSize: 18, cursor: "pointer", boxShadow: "0 6px 20px rgba(37, 99, 235, 0.2)" }}>
+          {loading ? "AI 정밀 분석 중..." : (mode === "single" ? "종목 심층 분석 시작" : "고수와 비교하기")}
         </button>
-        <div style={{ display: "flex", gap: "8px", boxSizing: "border-box" }}>
-          <button onClick={onShareOrCopy} disabled={!result} style={{ flex: 1, padding: "12px", borderRadius: "12px", border: "1px solid #111827", background: "white", fontWeight: "900", fontSize: "12px", boxSizing: "border-box" }}>공유/복사 📤</button>
-          <button onClick={() => { setResult(""); setTicker(""); setPortfolio([]); setPreviewUrl(null); setUploadStatus(""); setIsManual(false); }} style={{ flex: 1, padding: "12px", borderRadius: "12px", border: "1px solid #e5e7eb", background: "white", fontWeight: "900", fontSize: "12px", boxSizing: "border-box" }}>초기화</button>
+        <div style={{ display: "flex", gap: 10, boxSizing: "border-box" }}>
+          <button onClick={onShareOrCopy} disabled={!result} style={{ flex: 1, padding: "15px", borderRadius: 14, border: "1.5px solid #111827", background: "white", fontWeight: 900, fontSize: 14, cursor: "pointer" }}>공유/복사 📤</button>
+          <button onClick={() => { setResult(""); setTicker(""); setPortfolio([]); setPreviewUrl(null); setUploadStatus(""); setIsManual(false); }} style={{ flex: 1, padding: "15px", borderRadius: 14, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, fontSize: 14, cursor: "pointer" }}>입력 초기화</button>
         </div>
       </div>
 
-      {/* 🏆 Match Card */}
+      {/* 🏆 Match Card (결과 리포트 이미지) */}
       {matchingResult && (
-        <section style={{ marginTop: "30px", textAlign: "center", boxSizing: "border-box" }}>
-          <div ref={matchingCardRef} style={{ border: "4px solid #2563eb", borderRadius: "20px", padding: "30px 16px", boxSizing: "border-box", background: "#ffffff", width: "100%", maxWidth: "100%", margin: "0 auto", boxShadow: "0 10px 20px rgba(0,0,0,0.05)", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: -20, right: -20, opacity: 0.05, fontSize: "120px" }}>{matchingResult.emoji}</div>
-            <div style={{ fontWeight: "900", color: "#2563eb", fontSize: "11px", letterSpacing: "2px", marginBottom: "10px" }}>INVESTMENT STYLE MATCH</div>
-            <h2 style={{ fontSize: "22px", fontWeight: "900", marginBottom: "20px" }}>"{matchingResult.styleName}"</h2>
-            <div style={{ background: "#f8faff", borderRadius: "16px", padding: "30px 10px", border: "1px solid #e5e7eb", marginBottom: "16px", boxSizing: "border-box" }}>
-              <div style={{ fontSize: "60px", marginBottom: "10px" }}>{matchingResult.emoji}</div>
-              <div style={{ fontSize: "14px", fontWeight: "800", color: "#6b7280" }}>{matchingResult.expertName} 일치도</div>
-              <div style={{ fontSize: "50px", fontWeight: "900", color: "#2563eb" }}>{matchingResult.matchRate}%</div>
+        <section style={{ marginTop: 40, textAlign: "center", boxSizing: "border-box" }}>
+          <div ref={matchingCardRef} style={{ border: "4px solid #2563eb", borderRadius: 24, padding: "40px 20px", boxSizing: "border-box", background: "#ffffff", width: "100%", maxWidth: "480px", margin: "0 auto", boxShadow: "0 12px 30px rgba(37, 99, 235, 0.15)", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: -30, right: -30, opacity: 0.05, fontSize: 180 }}>{matchingResult.emoji}</div>
+            <div style={{ fontWeight: 900, color: "#2563eb", fontSize: 13, letterSpacing: 4, marginBottom: 15 }}>STYLE MATCH</div>
+            <h2 style={{ fontSize: 28, fontWeight: 900, marginBottom: 28 }}>"{matchingResult.styleName}"</h2>
+            <div style={{ background: "#f8faff", borderRadius: 20, padding: "40px 10px", border: "1px solid #e5e7eb", marginBottom: 24 }}>
+              <div style={{ fontSize: 80, marginBottom: 15 }}>{matchingResult.emoji}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#6b7280" }}>{matchingResult.expertName} 일치도</div>
+              <div style={{ fontSize: 64, fontWeight: 900, color: "#2563eb" }}>{matchingResult.matchRate}%</div>
             </div>
-            <p style={{ fontSize: "10px", color: "#9ca3af" }}>Analyzed by AI 투자 복기</p>
+            <p style={{ fontSize: 12, color: "#9ca3af", fontWeight: 700 }}>AI 투자 분석 솔루션</p>
           </div>
-          <button onClick={handleDownloadCard} disabled={imgLoading} style={{ marginTop: "16px", padding: "12px 24px", background: "#111827", color: "white", borderRadius: "12px", border: "none", fontWeight: "900", fontSize: "14px", boxSizing: "border-box" }}>
+          <button onClick={handleDownloadCard} disabled={imgLoading} style={{ marginTop: 20, padding: "16px 32px", background: "#111827", color: "white", borderRadius: 16, border: "none", fontWeight: 900, fontSize: 16 }}>
             📸 {imgLoading ? "이미지 생성 중..." : "결과 이미지 저장"}
           </button>
         </section>
       )}
 
-      {/* 분석 결과 */}
+      {/* 결과 분석 텍스트 */}
       {result && (
-        <section style={{ marginTop: "30px", border: "1px solid #e5e7eb", borderRadius: "16px", padding: "20px 16px", background: "white", boxSizing: "border-box" }}>
-          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "900", marginBottom: "12px", color: "#111827", borderBottom: "2px solid #f3f4f6", paddingBottom: "8px" }}>분석 리포트</h2>
-          <div style={{ fontSize: "14px", lineHeight: "1.7", color: "#374151" }}>
+        <section style={{ marginTop: 40, border: "1px solid #e5e7eb", borderRadius: 20, padding: 28, background: "white", boxSizing: "border-box" }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, marginBottom: 20, color: "#111827", borderBottom: "2.5px solid #f3f4f6", paddingBottom: 15 }}>AI 심층 리포트</h2>
+          <div style={{ fontSize: 15, lineHeight: 1.9, color: "#374151" }}>
             <ReactMarkdown>{result}</ReactMarkdown>
           </div>
         </section>
       )}
 
-      {/* 히스토리 */}
-      <section style={{ marginTop: "40px", borderTop: "2px solid #f3f4f6", paddingTop: "30px", boxSizing: "border-box" }}>
-        <h2 style={{ margin: "0 0 16px 0", fontSize: "18px", fontWeight: "900" }}>최근 기록</h2>
+      {/* 히스토리 기록 */}
+      <section style={{ marginTop: 48, borderTop: "2.5px solid #f3f4f6", paddingTop: 40, boxSizing: "border-box" }}>
+        <h2 style={{ margin: "0 0 20px 0", fontSize: 22, fontWeight: 900 }}>최근 분석 기록</h2>
         {history.length > 0 ? (
-          <div style={{ display: "grid", gap: "10px", boxSizing: "border-box" }}>
+          <div style={{ display: "grid", gap: 14, boxSizing: "border-box" }}>
             {history.map((h: any) => (
-              <div key={h.id} style={{ border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px", background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "center", boxSizing: "border-box" }}>
+              <div key={h.id} style={{ border: "1px solid #e5e7eb", borderRadius: 18, padding: 20, background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "center", boxSizing: "border-box" }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: "900", color: "#111827", fontSize: "15px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.ticker}</div>
-                  <div style={{ color: "#6b7280", fontSize: "11px" }}>{h.date.split(",")[0]}</div>
+                  <div style={{ fontWeight: 900, color: "#111827", fontSize: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.ticker}</div>
+                  <div style={{ color: "#6b7280", fontSize: 13 }}>{h.date.split(",")[0]}</div>
                 </div>
-                <button onClick={() => {setResult(h.content); window.scrollTo({top: 0, behavior:'smooth'});}} style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #2563eb", background: "white", color: "#2563eb", fontWeight: "900", fontSize: "12px", boxSizing: "border-box", flexShrink: 0 }}>불러오기</button>
+                <button onClick={() => {setResult(h.content); window.scrollTo({top: 0, behavior:'smooth'});}} style={{ padding: "12px 18px", borderRadius: 12, border: "1px solid #2563eb", background: "white", color: "#2563eb", fontWeight: 900, fontSize: 14, flexShrink: 0 }}>불러오기</button>
               </div>
             ))}
           </div>
         ) : (
-          <div style={{ textAlign: "center", padding: "30px", color: "#9ca3af", fontSize: "14px" }}>기록이 없습니다.</div>
+          <div style={{ textAlign: "center", padding: 50, color: "#9ca3af", fontSize: 15 }}>기록이 없습니다.</div>
         )}
       </section>
 
-      <p style={{ color: "#9ca3af", fontSize: "11px", marginTop: "40px", textAlign: "center", lineHeight: "1.5" }}>* 본 분석 결과는 AI 투자 참고용이며,<br/>최종 책임은 본인에게 있습니다.</p>
+      <p style={{ color: "#9ca3af", fontSize: 13, marginTop: 50, textAlign: "center", lineHeight: 1.6 }}>* 본 분석 결과는 AI 데이터 기반 투자 참고용이며,<br/>모든 투자의 최종 책임은 본인에게 있습니다.</p>
     </main>
   );
 }
