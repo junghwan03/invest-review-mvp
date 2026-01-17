@@ -227,7 +227,7 @@ export default function UpgradePage() {
   };
 
   return (
-    <main style={{ maxWidth: 920, margin: "24px auto", padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif", color: "#111827", minHeight: "100vh" }}>
+    <main style={{ maxWidth: 920, margin: "24px auto", padding: 16, boxSizing: "border-box", fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif", color: "#111827", minHeight: "100vh", overflowX: "hidden" }}>
       
       {/* 🚀 서비스 선택 메뉴 (토스 프론트 스타일) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 30 }}>
@@ -289,7 +289,7 @@ export default function UpgradePage() {
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 16 }}>
             <label style={{ fontWeight: 800 }}>분석할 종목명 또는 티커
-              <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="예: 삼성전자 / 테슬라 / TSLA" style={{ width: "100%", padding: 14, marginTop: 10, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", fontWeight: 700, fontSize: 16 }} />
+              <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="예: 삼성전자 / 테슬라 / TSLA" style={{ width: "100%", padding: 14, marginTop: 10, borderRadius: 12, border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none", fontWeight: 700, fontSize: 16 }} />
             </label>
             <div>
               <button onClick={() => setIsManual(!isManual)} style={{ fontSize: 13, fontWeight: 900, color: "#6b7280", background: "none", border: "none", padding: "4px 0", cursor: "pointer", textDecoration: "underline" }}>
@@ -299,19 +299,19 @@ export default function UpgradePage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 16 }}>
                   <div style={{ display: "grid", gap: 6 }}>
                     <div style={{ fontSize: 11, fontWeight: 900, color: "#9ca3af", textTransform: "uppercase", paddingLeft: 4 }}>PER (배)</div>
-                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", fontWeight: 700 }} value={manualData.per} onChange={e => setManualData({...manualData, per: e.target.value})} />
+                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none", fontWeight: 700 }} value={manualData.per} onChange={e => setManualData({...manualData, per: e.target.value})} />
                   </div>
                   <div style={{ display: "grid", gap: 6 }}>
                     <div style={{ fontSize: 11, fontWeight: 900, color: "#9ca3af", textTransform: "uppercase", paddingLeft: 4 }}>ROE (%)</div>
-                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", fontWeight: 700 }} value={manualData.roe} onChange={e => setManualData({...manualData, roe: e.target.value})} />
+                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none", fontWeight: 700 }} value={manualData.roe} onChange={e => setManualData({...manualData, roe: e.target.value})} />
                   </div>
                   <div style={{ display: "grid", gap: 6 }}>
                     <div style={{ fontSize: 11, fontWeight: 900, color: "#9ca3af", textTransform: "uppercase", paddingLeft: 4 }}>PBR (배)</div>
-                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", fontWeight: 700 }} value={manualData.pbr} onChange={e => setManualData({...manualData, pbr: e.target.value})} />
+                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none", fontWeight: 700 }} value={manualData.pbr} onChange={e => setManualData({...manualData, pbr: e.target.value})} />
                   </div>
                   <div style={{ display: "grid", gap: 6 }}>
                     <div style={{ fontSize: 11, fontWeight: 900, color: "#9ca3af", textTransform: "uppercase", paddingLeft: 4 }}>PSR (배)</div>
-                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", fontWeight: 700 }} value={manualData.psr} onChange={e => setManualData({...manualData, psr: e.target.value})} />
+                    <input type="number" placeholder="0.0" style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", boxSizing: "border-box", outline: "none", fontWeight: 700 }} value={manualData.psr} onChange={e => setManualData({...manualData, psr: e.target.value})} />
                   </div>
                 </div>
               )}
@@ -336,7 +336,8 @@ export default function UpgradePage() {
             </div>
             <div>
               <div style={{ fontWeight: 900, marginBottom: 14, fontSize: 15 }}>비교할 투자 고수 선택</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              {/* 🎯 수정 포인트: repeat(2, 1fr)로 2열 3행 그리드 적용 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
                 {EXPERTS.map(exp => (
                   <button key={exp.id} onClick={() => setSelectedExpert(exp.id)} style={{ padding: 16, borderRadius: 16, border: selectedExpert === exp.id ? "3px solid #2563eb" : "1px solid #e5e7eb", background: selectedExpert === exp.id ? "#eff6ff" : "white", cursor: "pointer", transition: "all 0.2s" }}>
                     <div style={{ fontSize: 28, marginBottom: 4 }}>{exp.emoji}</div>
@@ -363,7 +364,7 @@ export default function UpgradePage() {
       {/* 🏆 Match Card */}
       {matchingResult && (
         <section style={{ marginTop: 40, textAlign: "center" }}>
-          <div ref={matchingCardRef} style={{ border: "4px solid #2563eb", borderRadius: 24, padding: 36, background: "#ffffff", maxWidth: 480, margin: "0 auto", boxShadow: "0 12px 30px rgba(37, 99, 235, 0.15)", position: "relative", overflow: "hidden" }}>
+          <div ref={matchingCardRef} style={{ border: "4px solid #2563eb", borderRadius: 24, padding: "36px 20px", boxSizing: "border-box", background: "#ffffff", maxWidth: 480, margin: "0 auto", boxShadow: "0 12px 30px rgba(37, 99, 235, 0.15)", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: -30, right: -30, opacity: 0.05, fontSize: 180, transform: "rotate(15deg)" }}>{matchingResult.emoji}</div>
             <div style={{ fontWeight: 900, color: "#2563eb", fontSize: 13, letterSpacing: 4, marginBottom: 15, textTransform: "uppercase" }}>Investment Style Match</div>
             <h2 style={{ fontSize: 28, fontWeight: 900, marginBottom: 28, lineHeight: 1.4 }}>대표님은<br/>"{matchingResult.styleName}"</h2>
