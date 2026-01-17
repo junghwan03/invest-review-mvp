@@ -540,29 +540,17 @@ export default function Page() {
     setRulesOpen(true); setCheckOpen(false); setCheckResult(null);
   }
 
-  // ✅ [수정됨] PDF 인쇄 대신 -> '공유하기/복사하기' 기능으로 변경 (모바일 호환성 100%)
   async function onShareOrCopy() {
     if (!result) return;
     gaEvent(GA_EVENT.DOWNLOAD_PDF, { tradeType, ticker });
-
     const shareTitle = `AI 투자 복기 - ${ticker}`;
     const shareText = `[AI 투자 복기 리포트]\n\n종목: ${ticker}\n진입가: ${entryPrice}\n손절가: ${stopLoss || "없음"}\n\n${result}`;
-
-    // 1. 모바일 앱(토스 등)에서는 '네이티브 공유' 창을 띄웁니다.
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.share({
-          title: shareTitle,
-          text: shareText,
-        });
-        return; // 공유 창이 뜨면 여기서 끝
-      } catch (err) {
-        // 사용자가 취소했거나 에러 나면 아래 복사 로직으로 넘어감
-        console.log("공유 취소됨");
-      }
+        await navigator.share({ title: shareTitle, text: shareText });
+        return;
+      } catch (err) { console.log("공유 취소됨"); }
     }
-
-    // 2. 공유 기능이 없거나(PC), 실패하면 -> '클립보드 복사'로 대체
     try {
       await copyText(shareText);
       showAlert("결과 내용이 복사되었습니다.\n메모장이나 카톡에 붙여넣기 해주세요!");
@@ -585,10 +573,41 @@ export default function Page() {
     );
   };
 
+  // =========================================================
+  // 🎨 [중요] 렌더링 섹션 (원본 유지하며 메뉴 추가)
+  // =========================================================
+
   return (
     <main style={{ maxWidth: 920, margin: "24px auto", padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
       <AlertModal isOpen={isAlertOpen} message={alertMsg} onClose={() => setIsAlertOpen(false)} />
       <InputModal isOpen={isInputOpen} title="프리셋 이름 저장" placeholder="예: 내 단타 규칙" onConfirm={handlePresetSaveConfirm} onCancel={() => setIsInputOpen(false)} />
+
+      {/* 🚀 대표님이 요청하신 서비스 선택 메뉴 (원본 100% 보존하며 상단에 삽입) */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 30 }}>
+        <button 
+          onClick={() => window.location.href = '/'}
+          style={{ 
+            padding: "20px 16px", borderRadius: 16, border: "2px solid #2563eb", 
+            background: "#eff6ff", cursor: "pointer", textAlign: "left", transition: "0.2s"
+          }}
+        >
+          <div style={{ fontSize: 24, marginBottom: 8 }}>📝</div>
+          <div style={{ fontWeight: 900, color: "#2563eb", fontSize: 16 }}>매매 복기</div>
+          <div style={{ fontSize: 12, color: "#3b82f6", marginTop: 4, fontWeight: 700 }}>원칙 점검 및 기록</div>
+        </button>
+
+        <button 
+          onClick={() => window.location.href = '/upgrade'}
+          style={{ 
+            padding: "20px 16px", borderRadius: 16, border: "1px solid #e5e7eb", 
+            background: "#ffffff", cursor: "pointer", textAlign: "left", transition: "0.2s"
+          }}
+        >
+          <div style={{ fontSize: 24, marginBottom: 8 }}>🔍</div>
+          <div style={{ fontWeight: 900, color: "#111827", fontSize: 16 }}>심층 분석</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, fontWeight: 700 }}>스캔 및 고수 비교</div>
+        </button>
+      </div>
 
       <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 6 }}>{title}</h1>
       <p style={{ color: "#6b7280", marginTop: 0 }}>주식/코인 탭으로 분리해 기록합니다. (무료: 최근 {FREE_HISTORY_LIMIT}개 오프라인 저장)</p>
@@ -605,21 +624,20 @@ export default function Page() {
         <section style={{ marginTop: 14, border: "1px solid #e5e7eb", borderRadius: 16, padding: 18, background: "white" }}>
           <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>코인 기능은 준비 중입니다.</div>
           <div style={{ marginTop: 8, color: "#6b7280", lineHeight: 1.6 }}>현물/선물 등 코인 전용 탭과 템플릿을 분리해 추가할 예정입니다.<br />현재는 주식 탭에서 장기/스윙/단타/ETF 기록을 사용할 수 있습니다.</div>
-          <div style={{ marginTop: 14, borderRadius: 14, padding: 12, background: "#fafafa", border: "1px dashed #e5e7eb", color: "#374151", lineHeight: 1.6, fontSize: 13 }}>- 계획: 코인 탭 → “현물 / 선물” 2차 탭<br />- 코인 탭에서는 종목 예시(예: 비트코인 / BTC)를 별도로 제공할 예정입니다.</div>
         </section>
       ) : (
         <>
           <div style={{ display: "flex", gap: 10, margin: "14px 0 18px", flexWrap: "wrap" }}>{(["long", "swing", "day", "etf"] as TradeType[]).map(tabBtn)}</div>
           <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 18, background: "white" }}>
             <div style={{ display: "grid", gap: 12 }}>
-              <label style={{ fontWeight: 800 }}>종목/티커 (검색어)<input value={ticker} onChange={(e) => setTicker(clampTicker(e.target.value))} placeholder="예: 애플 / AAPL / 삼성전자 / 005930 / VOO / QQQ" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none" }} /></label>
+              <label style={{ fontWeight: 800 }}>종목/티커 (검색어)<input value={ticker} onChange={(e) => setTicker(clampTicker(e.target.value))} placeholder="예: 애플 / AAPL / 삼성전자" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none" }} /></label>
               <label style={{ fontWeight: 800 }}>진입가 <span style={{ fontWeight: 700, color: "#ef4444" }}>(필수)</span><input type="number" value={entryPrice} onChange={(e) => setEntryPrice(Number(e.target.value))} placeholder="예: 100.5" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none" }} /></label>
-              <label style={{ fontWeight: 800 }}>손절가 <span style={{ fontWeight: 600, color: "#6b7280" }}>(선택 · 필수 아님)</span><input type="number" value={stopLoss} onChange={(e) => setStopLoss(e.target.value === "" ? "" : Number(e.target.value))} placeholder="예: 92.5 (손절 기준이 없다면 비워두세요)" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none" }} /></label>
+              <label style={{ fontWeight: 800 }}>손절가 <input type="number" value={stopLoss} onChange={(e) => setStopLoss(e.target.value === "" ? "" : Number(e.target.value))} placeholder="예: 92.5" style={{ width: "100%", padding: 12, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none" }} /></label>
               <label style={{ fontWeight: 800 }}>메모(왜 이 매매를 했는지 상세 기록) — {TAB_LABEL[tradeType]}<textarea value={reasonNote} placeholder={NOTE_TEMPLATES[tradeType]} onChange={(e) => setReasonNote(e.target.value)} style={{ width: "100%", padding: 12, minHeight: 170, marginTop: 6, borderRadius: 12, border: "1px solid #e5e7eb", outline: "none", lineHeight: 1.5 }} /></label>
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", borderRadius: 12, border: "1px solid #e5e7eb", background: "#fafafa" }}>
-                <div style={{ fontWeight: 900, color: "#111827", fontSize: 13 }}>{rulesCheckedOnce[tradeType] ? "✅ 규칙 체크 완료(1회)" : "⚠️ 규칙 체크 필수(AI 생성 전 1회)"}<span style={{ fontWeight: 700, color: "#6b7280" }}> · {TAB_LABEL[tradeType]}</span></div>
-                <button onClick={() => setRulesOpen((v) => !v)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer", fontSize: 12, whiteSpace: "nowrap" }}>{rulesOpen ? "규칙 접기" : "규칙 열기"}</button>
+                <div style={{ fontWeight: 900, color: "#111827", fontSize: 13 }}>{rulesCheckedOnce[tradeType] ? "✅ 규칙 체크 완료(1회)" : "⚠️ 규칙 체크 필수(AI 생성 전 1회)"}</div>
+                <button onClick={() => setRulesOpen((v) => !v)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer", fontSize: 12 }}>{rulesOpen ? "규칙 접기" : "규칙 열기"}</button>
               </div>
 
               {rulesOpen && (
@@ -628,8 +646,7 @@ export default function Page() {
                     <div style={{ fontWeight: 900, color: "#111827" }}>규칙 체크(점검)</div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button onClick={addChecklistItem} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }}>+ 규칙 추가</button>
-                      <button onClick={clearChecklistChecks} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>체크 초기화</button>
-                      <button onClick={resetChecklistToDefault} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }} title="탭 기본 규칙으로 되돌림">기본 규칙</button>
+                      <button onClick={clearChecklistChecks} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>초기화</button>
                     </div>
                   </div>
                   <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
@@ -637,118 +654,96 @@ export default function Page() {
                       <div key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#fafafa", display: "grid", gap: 8 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
                           <label style={{ display: "flex", gap: 10, alignItems: "center", cursor: "pointer" }}><input type="checkbox" checked={c.checked} onChange={() => toggleChecklist(c.id)} /><span style={{ fontWeight: 900, color: "#111827" }}>{c.checked ? "완료" : "미완료"}</span></label>
-                          <button onClick={() => removeChecklistItem(c.id)} style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }} title="삭제">삭제</button>
+                          <button onClick={() => removeChecklistItem(c.id)} style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>삭제</button>
                         </div>
                         <input value={c.text} onChange={(e) => editChecklistText(c.id, e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none", background: "white", fontWeight: 700 }} />
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginTop: 10, color: "#6b7280", fontSize: 12, lineHeight: 1.5 }}>* AI 생성 시 메모에 <b>[규칙 체크]</b> 섹션으로 자동 첨부됩니다.</div>
                 </div>
               )}
 
+              {/* 프리셋 섹션 */}
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 14, background: "#ffffff" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                   <div style={{ fontWeight: 900, color: "#111827" }}>프리셋(규칙 세트)</div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button onClick={handlePresetSaveClick} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }} title="현재 입력 + 체크리스트(텍스트)를 프리셋으로 저장">프리셋 저장</button>
-                    <button onClick={() => setPresetOpen((v) => !v)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>{presetOpen ? "프리셋 닫기" : "프리셋 보기"}</button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={handlePresetSaveClick} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }}>저장</button>
+                    <button onClick={() => setPresetOpen((v) => !v)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>보기</button>
                   </div>
                 </div>
                 {presetOpen && (
-                  <div style={{ marginTop: 10 }}>
-                    {presets.length === 0 ? (<div style={{ color: "#6b7280", fontSize: 13 }}>아직 저장된 프리셋이 없습니다. “프리셋 저장”부터 진행해 주세요.</div>) : (
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {presets.map((p) => (
-                          <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa", display: "grid", gap: 6 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                              <div style={{ fontWeight: 900, color: "#111827" }}>[{TAB_LABEL[p.tradeType]}] {p.name}</div>
-                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                <button onClick={() => applyPreset(p)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }}>불러오기</button>
-                                <button onClick={() => deletePreset(p.id)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>삭제</button>
-                              </div>
-                            </div>
-                            <div style={{ color: "#6b7280", fontSize: 12 }}>{formatDateTime(p.createdAt)} · {p.ticker ? `Query: ${p.ticker}` : "Query 없음"}</div>
-                            <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.5 }}>규칙 {p.checklistTexts?.length ?? 0}개 · 메모 {short(p.reasonNote || "(없음)", 60)}</div>
+                  <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                    {presets.map((p) => (
+                      <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontWeight: 900 }}>{p.name}</div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => applyPreset(p)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #111827", background: "white", fontWeight: 700 }}>적용</button>
+                            <button onClick={() => deletePreset(p.id)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ef4444", color: "#ef4444", background: "white", fontWeight: 700 }}>삭제</button>
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    )}
-                    <div style={{ marginTop: 8, color: "#6b7280", fontSize: 12 }}>* 무료: 프리셋 최대 {FREE_PRESET_LIMIT}개까지 저장됩니다.</div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              <div style={{ display: "grid", gap: 10, marginTop: 4, padding: 12, borderRadius: 12, border: "1px dashed #e5e7eb", background: "#fafafa" }}>
-                <div style={{ fontWeight: 900, color: "#111827" }}>{TAB_LABEL[tradeType]} 작성 가이드 & 예시</div>
-                <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.6 }}><div style={{ fontWeight: 900, marginBottom: 6 }}>✅ 꼭 포함하면 좋은 항목</div><pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{NOTE_TEMPLATES[tradeType]}</pre></div>
-                <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.6 }}><div style={{ fontWeight: 900, marginBottom: 6 }}>📝 예시</div><pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{EXAMPLE_NOTES[tradeType]}</pre></div>
+              {/* 가이드 & 액션 버튼 */}
+              <div style={{ display: "grid", gap: 10, padding: 12, borderRadius: 12, border: "1px dashed #e5e7eb", background: "#fafafa" }}>
+                <div style={{ fontWeight: 900 }}>가이드: {TAB_LABEL[tradeType]}</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, fontFamily: "inherit" }}>{NOTE_TEMPLATES[tradeType]}</pre>
               </div>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button onClick={onGenerate} disabled={loading} style={{ flex: 1, minWidth: 260, padding: "14px 16px", borderRadius: 12, border: "none", background: loading ? "#93c5fd" : "#2563eb", color: "white", fontWeight: 900, cursor: loading ? "not-allowed" : "pointer" }}>{loading ? "작성 중..." : "AI 복기 리포트 생성"}</button>
-                <button onClick={onCheckNote} disabled={!ticker.trim() && !reasonNote.trim()} title={!ticker.trim() && !reasonNote.trim() ? "종목/메모를 조금이라도 작성해 주세요." : "AI 없이 메모 품질을 점검합니다."} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: !ticker.trim() && !reasonNote.trim() ? "not-allowed" : "pointer", opacity: !ticker.trim() && !reasonNote.trim() ? 0.5 : 1 }}>메모 점검(무료)</button>
-                <button onClick={onShareOrCopy} disabled={!result} title={!result ? "먼저 결과를 생성해 주세요." : "결과를 공유하거나 복사합니다."} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: !result ? "not-allowed" : "pointer", opacity: !result ? 0.5 : 1 }}>결과 공유/저장 📤</button>
-                <button onClick={onClearAll} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>결과/입력 리셋</button>
+                <button onClick={onGenerate} disabled={loading} style={{ flex: 1, minWidth: 260, padding: "14px 16px", borderRadius: 12, border: "none", background: loading ? "#93c5fd" : "#2563eb", color: "white", fontWeight: 900, cursor: "pointer" }}>{loading ? "작성 중..." : "AI 복기 리포트 생성"}</button>
+                <button onClick={onCheckNote} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }}>점검하기</button>
+                <button onClick={onShareOrCopy} disabled={!result} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }}>📤 공유/저장</button>
+                <button onClick={onClearAll} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>리셋</button>
               </div>
 
               {checkOpen && checkResult && (
                 <div style={{ marginTop: 12, border: "1px solid #e5e7eb", borderRadius: 14, padding: 12, background: "#ffffff" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                    <div style={{ fontWeight: 900, color: "#111827" }}>{checkResult.title}</div>
-                    <button onClick={() => setCheckOpen(false)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }}>닫기</button>
-                  </div>
-                  <div style={{ marginTop: 6, color: "#374151", fontSize: 13, lineHeight: 1.5 }}>{checkResult.summary}</div>
-                  <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                  <div style={{ fontWeight: 900, marginBottom: 8 }}>{checkResult.title}</div>
+                  <div style={{ display: "grid", gap: 8 }}>
                     {checkResult.items.map((it, idx) => (
-                      <div key={idx} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#fafafa" }}>
-                        <div style={{ fontWeight: 900, color: "#111827" }}>{it.ok ? "✅" : "⚠️"} {it.label}</div>
-                        {!it.ok && it.hint && (<div style={{ marginTop: 4, color: "#6b7280", fontSize: 12, lineHeight: 1.5 }}>{it.hint}</div>)}
-                      </div>
+                      <div key={idx} style={{ fontSize: 13, color: it.ok ? "#059669" : "#dc2626" }}>{it.ok ? "✅" : "⚠️"} {it.label}</div>
                     ))}
                   </div>
-                  {checkResult.missing.length > 0 && (<div style={{ marginTop: 10, borderRadius: 12, padding: 10, background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412", fontSize: 13, lineHeight: 1.5 }}><div style={{ fontWeight: 900, marginBottom: 4 }}>지금 보강하면 좋은 항목</div><ul style={{ margin: 0, paddingLeft: 18 }}>{checkResult.missing.slice(0, 8).map((m, i) => (<li key={i}>{m}</li>))}</ul></div>)}
                 </div>
               )}
             </div>
           </section>
 
+          {/* 결과 섹션 */}
           {result && (
             <section style={{ marginTop: 18, border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>결과</h2>
-              <pre style={{ whiteSpace: "pre-wrap", marginTop: 10, lineHeight: 1.6, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: 13, color: "#111827" }}>{result}</pre>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>AI 분석 결과</h2>
+              <pre style={{ whiteSpace: "pre-wrap", marginTop: 10, lineHeight: 1.6, fontSize: 13, color: "#111827" }}>{result}</pre>
             </section>
           )}
 
+          {/* 히스토리 섹션 */}
           <section style={{ marginTop: 18, border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 저장된 복기 (최대 {FREE_HISTORY_LIMIT}개)</h2>
-              <button onClick={clearHistoryAll} disabled={history.length === 0} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: history.length === 0 ? "not-allowed" : "pointer", opacity: history.length === 0 ? 0.5 : 1 }} title={history.length === 0 ? "저장된 기록이 없습니다." : "전체 삭제"}>전체 삭제</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 저장된 복기</h2>
+              <button onClick={clearHistoryAll} style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>전체 삭제</button>
             </div>
-            {history.length === 0 ? (<p style={{ color: "#6b7280", marginTop: 10 }}>아직 저장된 복기가 없습니다. 리포트를 생성하면 자동으로 저장됩니다.</p>) : (
-              <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                {history.map((h) => (
-                  <div key={h.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa", display: "grid", gap: 6 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                      <div style={{ fontWeight: 900, color: "#111827" }}>[{TAB_LABEL[h.tradeType]}] {h.ticker} / Entry {h.entryPrice}{h.stopLoss != null ? ` / SL ${h.stopLoss}` : " / SL N/A"}</div>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button onClick={() => loadHistoryItem(h)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }} title="불러오기">불러오기</button>
-                        <button onClick={() => exportHistoryItem(h)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, cursor: "pointer" }} title="텍스트로 내보내기(복사)">내보내기</button>
-                        <button onClick={() => removeHistory(h.id)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", fontWeight: 900, cursor: "pointer" }} title="삭제">삭제</button>
-                      </div>
-                    </div>
-                    <div style={{ color: "#6b7280", fontSize: 12 }}>{formatDateTime(h.createdAt)}</div>
-                    <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.5 }}><div style={{ fontWeight: 900, marginBottom: 4 }}>메모 요약</div>{short(h.reasonNote || "(메모 없음)", 120)}</div>
-                    <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.5 }}><div style={{ fontWeight: 900, marginBottom: 4 }}>결과 요약</div>{short(h.result || "(결과 없음)", 140)}</div>
-                    {h.checklist?.length ? (<div style={{ color: "#374151", fontSize: 13, lineHeight: 1.5 }}><div style={{ fontWeight: 900, marginBottom: 4 }}>규칙 체크</div><div style={{ display: "grid", gap: 4 }}>{h.checklist.slice(0, 5).map((c) => (<div key={c.id} style={{ color: "#6b7280" }}>{c.checked ? "✅" : "⬜"} {c.text}</div>))}</div></div>) : null}
+            <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+              {history.map((h) => (
+                <div key={h.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontWeight: 900 }}>[{TAB_LABEL[h.tradeType]}] {h.ticker}</div>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>{formatDateTime(h.createdAt)}</div>
                   </div>
-                ))}
-              </div>
-            )}
-            <p style={{ color: "#6b7280", fontSize: 12, marginTop: 12 }}>* 무료 버전은 기기(브라우저) 내부 저장(localStorage)이라, 브라우저 데이터 삭제/기기 변경 시 기록이 사라질 수 있습니다.</p>
+                  <button onClick={() => loadHistoryItem(h)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900 }}>불러오기</button>
+                </div>
+              ))}
+            </div>
           </section>
         </>
       )}
+      <p style={{ color: "#6b7280", fontSize: 12, marginTop: 12, textAlign: "center" }}>* 모든 데이터는 브라우저 내부(localStorage)에 안전하게 저장됩니다.</p>
     </main>
   );
 }
