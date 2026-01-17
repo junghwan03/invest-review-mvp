@@ -29,6 +29,13 @@ const EXPERTS = [
 const DAILY_LIMIT = 3;
 const LIMIT_KEY = "daily_upgrade_limit_v1";
 const HISTORY_KEY = "analysis_history_v1";
+const FREE_HISTORY_LIMIT = 10;
+
+// 날짜 포맷 헬퍼
+function formatDateTime(ts: number) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 export default function UpgradePage() {
   const [mode, setMode] = useState<"single" | "portfolio">("single");
@@ -48,6 +55,7 @@ export default function UpgradePage() {
   const [portfolio, setPortfolio] = useState<{ ticker: string; weight: number }[]>([]);
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
   const [selectedExpert, setSelectedExpert] = useState("warren_buffett");
+  const [history, setHistory] = useState<any[]>([]);
   const matchingCardRef = useRef<HTMLDivElement>(null);
 
   const showAlert = (msg: string) => { setAlertMsg(msg); setIsAlertOpen(true); };
@@ -60,7 +68,33 @@ export default function UpgradePage() {
       const parsed = JSON.parse(rawLimit);
       setRemaining(parsed.date === today ? Math.max(0, DAILY_LIMIT - parsed.count) : DAILY_LIMIT);
     }
+    const rawHistory = localStorage.getItem(HISTORY_KEY);
+    if (rawHistory) setHistory(JSON.parse(rawHistory).slice(0, FREE_HISTORY_LIMIT));
   }, []);
+
+  const saveToHistory = (item: any) => {
+    const newHistory = [item, ...history].slice(0, FREE_HISTORY_LIMIT);
+    setHistory(newHistory);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
+  };
+
+  const loadHistoryItem = (h: any) => {
+    setMode(h.mode);
+    setTicker(h.ticker || "");
+    setResult(h.result);
+    setMatchingResult(h.matchingResult || null);
+    if (h.manualData) {
+      setIsManual(true);
+      setManualData(h.manualData);
+    }
+    if (h.portfolio) setPortfolio(h.portfolio);
+    showAlert("이전 기록을 불러왔습니다.");
+  };
+
+  const clearHistoryAll = () => {
+    setHistory([]);
+    localStorage.removeItem(HISTORY_KEY);
+  };
 
   const handleVisionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -111,11 +145,28 @@ export default function UpgradePage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      setResult(data.content || data);
+      const content = data.content || data;
+      setResult(content);
+      
+      let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
-        setMatchingResult({ styleName: "전략적 투자자", expertName: sel?.name, matchRate: Math.floor(Math.random() * 15) + 82, emoji: sel?.emoji });
+        currentMatch = { styleName: "전략적 투자자", expertName: sel?.name, matchRate: Math.floor(Math.random() * 15) + 82, emoji: sel?.emoji };
+        setMatchingResult(currentMatch);
       }
+
+      // 히스토리에 저장
+      saveToHistory({
+        id: Date.now(),
+        createdAt: Date.now(),
+        mode,
+        ticker: mode === "single" ? ticker : `${portfolio.length}개 종목`,
+        result: content,
+        manualData: mode === "single" ? manualData : null,
+        portfolio: mode === "portfolio" ? portfolio : null,
+        matchingResult: currentMatch
+      });
+
       const nextCount = (usage.date === today ? usage.count : 0) + 1;
       localStorage.setItem(LIMIT_KEY, JSON.stringify({ date: today, count: nextCount }));
       setRemaining(DAILY_LIMIT - nextCount);
@@ -142,7 +193,6 @@ export default function UpgradePage() {
         오늘 무료 사용: {DAILY_LIMIT - remaining} / {DAILY_LIMIT} (남은 횟수: {remaining})
       </div>
 
-      {/* 📸 Vision 카드 (모래시계 로직 추가) */}
       <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center", position: "relative" }}>
         <label style={{ cursor: "pointer", display: "block" }}>
           <div style={{ position: "relative", width: "fit-content", margin: "0 auto" }}>
@@ -153,7 +203,7 @@ export default function UpgradePage() {
               </div>
             ) : (
               <>
-                <img src={previewUrl} style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }} />
+                <img src={previewUrl} style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #2563eb" }} />
                 {visionLoading && (
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.7)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
                     ⏳
@@ -188,13 +238,7 @@ export default function UpgradePage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {["per", "roe", "pbr", "psr"].map((k) => (
                   <div key={k} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                    <input 
-                      placeholder={k.toUpperCase()} 
-                      type="number" 
-                      style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} 
-                      value={(manualData as any)[k]} 
-                      onChange={e => setManualData({...manualData, [k]: e.target.value})} 
-                    />
+                    <input placeholder={k.toUpperCase()} type="number" style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} value={(manualData as any)[k]} onChange={e => setManualData({...manualData, [k]: e.target.value})} />
                     <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>
                       {(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}
                     </span>
@@ -246,10 +290,33 @@ export default function UpgradePage() {
       )}
 
       {result && (
-        <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.7 }}>
+        <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.7, marginBottom: 20 }}>
           <ReactMarkdown>{result}</ReactMarkdown>
         </section>
       )}
+
+      {/* 📜 심층 분석 히스토리 섹션 추가 */}
+      <section style={{ marginTop: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 심층 분석 기록</h2>
+          <button onClick={clearHistoryAll} style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>전체 삭제</button>
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          {history.length > 0 ? history.map((h) => (
+            <div key={h.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 14 }}>{h.ticker}</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>{formatDateTime(h.createdAt)}</div>
+              </div>
+              <button onClick={() => loadHistoryItem(h)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, fontSize: 12, cursor: "pointer" }}>불러오기</button>
+            </div>
+          )) : (
+            <div style={{ textAlign: "center", padding: "20px 0", color: "#9ca3af", fontSize: 13 }}>저장된 분석 기록이 없습니다.</div>
+          )}
+        </div>
+      </section>
+
+      <p style={{ color: "#6b7280", fontSize: 12, marginTop: 20, textAlign: "center" }}>* 모든 데이터는 브라우저 내부(localStorage)에 안전하게 저장됩니다.</p>
     </main>
   );
 }
