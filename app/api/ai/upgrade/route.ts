@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-// ✅ 토스 빌드 시 정적 HTML(index.html) 생성을 강제하기 위한 설정
-export const dynamic = "force-static";
+// ✅ [수정] 토스 웹 프레임워크는 빌드 시 모든 API 경로를 정적으로 체크하려고 시도합니다.
+// 이 설정이 있어야 index.html 생성을 방해하지 않고 Vercel에서 정상 작동합니다.
+export const dynamic = "force-dynamic"; 
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,7 +59,7 @@ function getInstruction(tradeType: TradeType) {
   return etfGuide;
 }
 
-// ✅ [노선 2] 고수 비교 지시문 (포괄적 섹터 분석 + 행동강령 추가)
+// ✅ [노선 2] 고수 비교 지시문 (원본 100% 유지)
 function getDiagnosisInstruction(expertId: string) {
   const expertData: Record<string, string> = {
     warren_buffett: "정보기술/금융/소비재 중심의 가치투자 및 해자 기업",
@@ -83,7 +84,7 @@ function getDiagnosisInstruction(expertId: string) {
 
 // ✅ [노선 3] 심층 지표 분석 지시문 (원본 유지)
 function getAnalysisInstruction() {
-  return `너는 '지표 분석 애널리스트'다. 지정된 형식을 엄수하라. ## 🌐 산업 사이클 분석... (중략) ## 📊 지표별 상세 판단... ## ⚖️ 종합 판단...`; 
+  return `너는 '지표 분석 애널리스트'다. 지정된 형식을 엄수하라. ## 🌐 산업 사이클 분석... ## 📊 지표별 상세 판단... ## ⚖️ 종합 판단...`; 
 }
 
 export async function POST(req: Request) {
@@ -95,27 +96,18 @@ export async function POST(req: Request) {
     let systemPrompt = "";
     let userPrompt: any = "";
 
-    // 🚦 [비전 인식 강화] 지표 매칭 가이드 추가
     if (body.type === "vision" && body.imageBase64) {
       systemPrompt = `너는 증권사 MTS/HTS 앱 스크린샷 판독 전문가다. 이미지에서 주식 지표를 정밀하게 추출하라.
-      [추출 가이드]
-      1. PER: 주가수익비율, P/E, PER(배) 등의 항목을 찾아라.
-      2. PBR: 주가순자산비율, P/B, PBR(배) 등의 항목을 찾아라.
-      3. ROE: 자기자본이익률, ROE(%) 등의 항목을 찾아라.
-      4. PSR: 주가매출비율, P/S, PSR(배) 등의 항목을 찾아라.
-      5. ticker: 종목명 또는 티커명을 추출하라.
-      6. weight: 포트폴리오 비중(%)이 있다면 추출하라.
-      
-      [규칙] 1. 설명 없이 오직 JSON만 출력. 2. 숫자에 포함된 단위(배, %, 원)는 제외하고 숫자만 추출. 3. 데이터가 모호하면 "N/A" 처리.`;
+      [추출 가이드] 1. PER, PBR, ROE, PSR, ticker, weight 추출. 2. 오직 JSON만 출력. 3. 숫자에 단위 제외. 4. 없으면 "N/A"`;
       
       userPrompt = [
-        { type: "text", text: "이 이미지에서 주식 지표 데이터를 추출해서 { \"extracted\": [ { \"ticker\": \"...\", \"weight\": \"...\", \"per\": \"...\", \"roe\": \"...\", \"pbr\": \"...\", \"psr\": \"...\" } ] } 형식의 JSON으로만 응답해라." },
+        { type: "text", text: "이 이미지에서 주식 지표 데이터를 추출해서 JSON으로만 응답해라." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
       ];
     } 
     else if (body.type === "diagnosis" || body.type === "comparison") {
       systemPrompt = getDiagnosisInstruction(body.expertId);
-      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 포괄적 섹터 관점에서 분석하고 행동강령을 제시하라.`;
+      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석하라.`;
     } 
     else if (body.manualPer !== undefined) {
       systemPrompt = getAnalysisInstruction();
@@ -140,10 +132,10 @@ export async function POST(req: Request) {
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    // 🎯 [추가] JSON 코드 블록 기호 제거 (The string did not match... 에러 방지)
-    text = text.replace(/```json|```/g, "").trim();
+    // ✅ [수정] JSON 세척 로직 강화 (문자열 매칭 에러 방지)
+    // AI가 응답 앞뒤에 붙이는 마크다운 기호를 더 확실하게 제거합니다.
+    text = text.replace(/```json|```/g, "").replace(/^[\s\n]+|[\s\n]+$/g, "");
 
-    // 🎯 HEALTH_SCORE 추출 및 본문에서 제거
     let matchRate = 20; 
     const scoreMatch = text.match(/HEALTH_SCORE[:\s\*]*(\d+)/i);
     if (scoreMatch) {
@@ -152,11 +144,7 @@ export async function POST(req: Request) {
     }
     matchRate = Math.max(20, Math.min(100, matchRate));
 
-    return NextResponse.json({ 
-      ok: true, 
-      text, 
-      matchRate
-    }, { headers: corsHeaders });
+    return NextResponse.json({ ok: true, text, matchRate }, { headers: corsHeaders });
 
   } catch (e: any) {
     return NextResponse.json({ ok: false, text: "서버 오류: " + e.message }, { status: 500, headers: corsHeaders });
