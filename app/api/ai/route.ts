@@ -187,9 +187,37 @@ function prependFixedPriceMeta(text: string, ticker: string, inputPrice: number)
   const meta = `입력 가격 $${inputPrice} 기준 분석 결과 (${ticker})`;
   const trimmed = (text ?? "").trim();
   if (!trimmed) return meta;
-  // 이미 포함돼 있으면 중복 방지
   if (trimmed.includes(`$${inputPrice}`) && trimmed.includes("입력 가격")) return trimmed;
   return `${meta}\n\n${trimmed}`;
+}
+
+// ✅ 모델이 혹시라도 다른 가격을 만들어 쓰면 서버가 제거/치환
+function enforcePriceInText(text: string, inputPrice: number) {
+  const fixed = `$${inputPrice}`;
+
+  let t = (text ?? "").trim();
+
+  // 1) 달러 가격 패턴을 전부 찾아서 "입력 가격"으로 바꿈
+  //    (모델이 $437.5 같은 걸 박는 경우 강제 제거)
+  t = t.replace(/\$\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?/g, "입력 가격");
+
+  // 2) 혹시 "437.5달러" 같이 달러기호 없이도 쓰면 제거(너무 공격적이지 않게 '달러' 붙은 경우만)
+  t = t.replace(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*달러\b/g, "입력 가격");
+
+  // 3) 최상단에만 서버가 고정 가격 메타를 넣는다
+  //    (본문에서는 '입력 가격'이라고만 나오게 해서 변형 자체를 못 하게 함)
+  //    => 네 요구: "내가 입력한 가격으로 나오게"는 메타 라인에서 보장
+  //       본문은 가격 대신 '입력 가격'으로 표기
+  if (!t.startsWith("입력 가격")) {
+    t = `입력 가격 ${fixed} 기준 분석 결과\n\n${t}`;
+  } else {
+    // 이미 시작이 입력 가격이면, 그래도 숫자까지 고정해서 1줄로 정리
+    const lines = t.split("\n");
+    lines[0] = `입력 가격 ${fixed} 기준 분석 결과`;
+    t = lines.join("\n");
+  }
+
+  return t;
 }
 
 // =========================================================
@@ -245,14 +273,12 @@ export async function POST(req: Request) {
 ${body.reasonNote ?? ""}
       `.trim();
     }
-    // --- [분기 4] 종목 심층 분석 (입력 가격 절대 고정) ---
+    // --- [분기 4] 종목 심층 분석 (입력 가격 절대 고정 + 서버 후처리로 강제) ---
     else {
       const ticker = String(body.ticker || "UNKNOWN").toUpperCase();
 
       // ✅ currentPrice 강제 파싱 + 유효성 검사
       const inputPriceNum = parseNumberOrNull(body.currentPrice);
-
-      // inputPrice가 없으면 “분석 불가”로 400 반환 (undefined/데이터없음 방지)
       if (inputPriceNum === null) {
         return jsonResponse(
           { ok: false, text: "currentPrice(현재가)가 비어있거나 숫자가 아닙니다. 예: 436 또는 '436' 형태로 보내주세요." },
@@ -265,18 +291,20 @@ ${body.reasonNote ?? ""}
       const manualPbr = body.manualPbr ?? "N/A";
       const manualPsr = body.manualPsr ?? "N/A";
 
-      temp = 0; // 가격/숫자 조작 최소화
+      temp = 0;
+
+      // ✅ 핵심: 모델이 가격 숫자를 “본문에 쓰지 못하게” 금지
+      //    (가격은 서버가 메타로만 보여줌)
       systemPrompt = `
 너는 월가 출신의 수석 애널리스트다.
 
 [🚨 입력값 절대 고정 규칙]
-- 아래에 제공된 "입력 가격"은 절대 수정/반올림/소수점 추가/대체/추정하지 마라.
-- 본문에서 "현재가/주가/가격"을 언급할 때는 반드시 이 입력 가격을 그대로 사용하라.
-- 다른 가격을 새로 만들어서 쓰는 행위는 금지. (예: 436 → 437.5 같은 변형 금지)
-- 값이 없다고 가정하지 마라. 모르면 N/A라고만 써라.
+- "입력 가격" 숫자(달러 금액)를 본문에 직접 쓰지 마라.
+- 본문에서 가격을 언급할 때는 항상 "입력 가격"이라고만 표현하라.
+- 새로운 가격을 추정/반올림/소수점 추가로 만들어 쓰는 행위는 금지.
 
 [출력 시작 형식(고정)]
-첫 줄은 반드시 아래 문장으로 시작:
+- 첫 줄은 반드시 아래 문장으로 시작:
 "입력 가격 $${inputPriceNum} 기준 분석 결과 (${ticker})"
 
 [행동 제한]
@@ -296,7 +324,7 @@ ${body.reasonNote ?? ""}
 
 요구사항:
 1) 첫 줄은 반드시 "입력 가격 $${inputPriceNum} 기준 분석 결과 (${ticker})"
-2) 본문에서 가격을 언급할 때는 $${inputPriceNum}만 사용
+2) 본문에서 가격을 언급할 때는 숫자 대신 "입력 가격"이라고만 쓸 것
 3) 지표가 N/A면 N/A로 표시하고, 대신 체크포인트/리스크를 구조화해서 제시
       `.trim();
     }
@@ -326,12 +354,15 @@ ${body.reasonNote ?? ""}
 
     let text = data?.choices?.[0]?.message?.content ?? "";
 
-    // ✅ 심층분석 분기에서만: 첫 줄 메타를 서버가 강제로 박아 넣음(혹시 모델이 빼먹어도 고정)
+    // ✅ 심층분석 분기에서만: 서버가 가격을 강제 고정 + 모델이 만든 가격 전부 제거/치환
     if (!body.type && !body.tradeType) {
       const ticker = String(body.ticker || "UNKNOWN").toUpperCase();
       const inputPriceNum = parseNumberOrNull(body.currentPrice);
       if (inputPriceNum !== null) {
+        // (1) 혹시 모델이 첫 줄을 빼먹어도 메타 강제 추가
         text = prependFixedPriceMeta(text, ticker, inputPriceNum);
+        // (2) 본문 내 임의 가격 제거 + 메타 라인 가격 강제 고정
+        text = enforcePriceInText(text, inputPriceNum);
       }
     }
 
