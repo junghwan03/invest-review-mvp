@@ -10,7 +10,7 @@ function normalizeTradeType(v: any): TradeType {
 }
 
 // =========================================================
-// 📝 [기록 보존] 매매 복기용 가이드라인 (절대 삭제 금지)
+// 📝 [기록 보존] 매매 복기용 가이드라인 (절대 삭제/생략 금지)
 // =========================================================
 function getInstruction(tradeType: TradeType) {
   const commonRules = `
@@ -158,9 +158,7 @@ async function safeReadJson(req: Request) {
 async function parseOpenAIResponse(res: Response) {
   const contentType = res.headers.get("content-type") || "";
   const raw = await res.text();
-
   if (!raw || !raw.trim()) return { raw: "", data: null as any };
-
   if (contentType.includes("application/json")) {
     try {
       return { raw, data: JSON.parse(raw) };
@@ -168,12 +166,11 @@ async function parseOpenAIResponse(res: Response) {
       return { raw, data: null as any };
     }
   }
-
   return { raw, data: null as any };
 }
 
 // =========================================================
-// 🚀 [수정됨] POST 함수: 매매 복기 + 심층 분석 통합 로직
+// 🚀 [수정됨] POST 함수: 전 종목 대응 심층 분석 통합
 // =========================================================
 export async function POST(req: Request) {
   try {
@@ -182,10 +179,7 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return jsonResponse(
-        { ok: false, text: "OPENAI_API_KEY가 없습니다. (Vercel Environment Variables 확인)" },
-        500
-      );
+      return jsonResponse({ ok: false, text: "API Key 미설정" }, 500);
     }
 
     let model = "gpt-4o-mini"; 
@@ -195,51 +189,38 @@ export async function POST(req: Request) {
     // --- [분기 1] 비전 분석 (스크린샷 인식) ---
     if (body.type === "vision" && body.imageBase64) {
       model = "gpt-4o"; 
-      systemPrompt = "너는 주식 데이터 추출 전문가다. 반드시 JSON 형식으로만 응답하라.";
+      systemPrompt = "주식 데이터 추출 전문가. JSON으로만 응답하라.";
       userPrompt = [
-        { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight(비중%)를 추출해 JSON으로 줘." },
+        { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight(비중%) 추출." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
       ];
     } 
-    // --- [분기 2] 고수 비교 분석 (Comparison) ---
+    // --- [분기 2] 고수 비교 분석 ---
     else if (body.type === "comparison") {
       const experts: any = {
         warren_buffett: "워런 버핏", nancy_pelosi: "낸시 펠로시", cathie_wood: "캐시 우드",
         ray_dalio: "레이 달리오", michael_burry: "마이클 버리", korean_top1: "한국 1% 고수"
       };
-      const expertName = experts[body.expertId] || "투자 고수";
-      systemPrompt = `너는 ${expertName}의 투자 철학을 가진 AI다. 사용자의 포트폴리오를 냉철하게 분석하라.`;
-      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언을 작성하라.`;
+      systemPrompt = `너는 ${experts[body.expertId] || "투자 고수"}다. 사용자의 포트폴리오를 분석하라.`;
+      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언 작성.`;
     } 
-    // --- [분기 3] 기존 매매 복기 (Trade Review) ---
+    // --- [분기 3] 매매 복기 ---
     else if (body.tradeType) {
       const tradeType = normalizeTradeType(body.tradeType);
       systemPrompt = getInstruction(tradeType);
-      userPrompt = `
-[매매유형] ${tradeType}
-[종목] ${String(body.ticker ?? "").toUpperCase()}
-[진입가] ${body.entryPrice ?? ""}
-[손절가] ${body.stopLoss === null || body.stopLoss === "" ? "N/A" : body.stopLoss}
-[메모] ${body.reasonNote ?? ""}
-`.trim();
+      userPrompt = `[종목] ${String(body.ticker ?? "").toUpperCase()} [진입] ${body.entryPrice} [메모] ${body.reasonNote}`;
     }
-    // --- [분기 4] 종목 심층 분석 (Single Stock) ---
+    // --- [분기 4] 종목 심층 분석 (미국 전 종목 대응) ---
     else {
       systemPrompt = `
-너는 월가 출신의 냉철한 주식 분석 전문가다. 
-[절대 준수 사항]
-1. 사용자가 제공한 현재가(${body.currentPrice})를 절대적인 기준으로 삼아라. 네 내부 학습 데이터나 외부 가격 정보를 사용하여 이 숫자를 수정하지 마라.
-2. 모든 밸류에이션 계산과 리포트 작성은 오직 사용자가 입력한 가격(${body.currentPrice})을 기준으로 수행하라.
-3. 매수/매도, 분할 매수와 같은 직접적인 투자 행동 제안은 절대 하지 말고, 오직 시장의 객관적 상태와 데이터 분석만 제공할 것.
+너는 월가 수석 애널리스트다. 
+[핵심 지침]
+1. 사용자가 입력한 현재가(${body.currentPrice})를 절대적인 분석 기준으로 삼아라. AI의 내부 학습 시세가 달라도 무조건 이 가격을 팩트로 취급한다.
+2. 분석 대상 종목(${body.ticker})이 어떤 미국 주식(S&P 500, NASDAQ, NYSE 등)이든 네 지식을 총동원하라. 설령 최신 재무 데이터가 부족하더라도 해당 기업의 비즈니스 모델, 섹터 점유율, 그리고 사용자가 입력한 지표(PER: ${body.manualPer}, ROE: ${body.manualRoe} 등)를 결합해 반드시 전문적인 리포트를 작성해야 한다.
+3. '데이터가 부족하여 분석할 수 없다'는 식의 답변은 절대 금지한다.
+4. 직접적인 매수/매도 제안은 절대 금지하며, 오직 데이터와 시장 상황의 객관적 분석만 제공한다.
 `.trim();
-      userPrompt = `
-[분석 대상 데이터]
-- 종목: ${body.ticker}
-- 기준 현재가: ${body.currentPrice} (이 숫자를 100% 신뢰하고 분석할 것)
-- 입력 지표: PER ${body.manualPer}, ROE ${body.manualRoe}, PBR ${body.manualPbr}, PSR ${body.manualPsr}
-
-위 데이터를 바탕으로 정밀 심층 리포트를 작성하라.
-`.trim();
+      userPrompt = `[종목] ${body.ticker}, [가격] ${body.currentPrice}, [지표] PER:${body.manualPer}, ROE:${body.manualRoe}, PBR:${body.manualPbr}, PSR:${body.manualPsr}. 위 데이터를 기반으로 심층 분석 리포트를 작성하라.`;
     }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -250,8 +231,8 @@ export async function POST(req: Request) {
       },
       cache: "no-store",
       body: JSON.stringify({
-        model: model,
-        temperature: 0.1, // 가격 정확도를 위해 온도를 더 낮춤
+        model,
+        temperature: 0.2, // 정확도를 위해 낮게 유지
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -260,16 +241,12 @@ export async function POST(req: Request) {
     });
 
     const { raw, data } = await parseOpenAIResponse(res);
-
-    if (!res.ok) {
-      const msg = data?.error?.message || (raw ? raw.slice(0, 400) : "OpenAI 응답 오류");
-      return jsonResponse({ ok: false, text: `OpenAI 에러 (${res.status}): ${msg}` }, 500);
-    }
+    if (!res.ok) return jsonResponse({ ok: false, text: `API 에러: ${data?.error?.message || "오류"}` }, 500);
 
     const text = data?.choices?.[0]?.message?.content;
     return jsonResponse({ ok: true, text, content: text }, 200);
 
   } catch (e: any) {
-    return jsonResponse({ ok: false, text: `서버 오류: ${String(e?.message ?? e)}` }, 500);
+    return jsonResponse({ ok: false, text: `서버 오류: ${e.message}` }, 500);
   }
 }
