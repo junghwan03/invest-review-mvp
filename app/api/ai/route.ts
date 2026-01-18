@@ -188,13 +188,14 @@ export async function POST(req: Request) {
       );
     }
 
+    // ✅ 변수 선언 (타입 에러 방지를 위해 userPrompt를 any로 설정)
     let model = "gpt-4o-mini"; 
     let systemPrompt = "";
     let userPrompt: any = ""; 
 
     // --- [분기 1] 비전 분석 (스크린샷 인식) ---
     if (body.type === "vision" && body.imageBase64) {
-      model = "gpt-4o"; 
+      model = "gpt-4o"; // 비전 인식은 4o 필수
       systemPrompt = "너는 주식 데이터 추출 전문가다. 반드시 JSON 형식으로만 응답하라.";
       userPrompt = [
         { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight(비중%)를 추출해 JSON으로 줘." },
@@ -225,21 +226,8 @@ export async function POST(req: Request) {
     }
     // --- [분기 4] 종목 심층 분석 (Single Stock) ---
     else {
-      systemPrompt = `
-너는 월가 출신의 냉철한 주식 분석 전문가다. 
-[절대 준수 사항]
-1. 사용자가 제공한 현재가(${body.currentPrice})를 절대적인 기준으로 삼아라. 네 내부 학습 데이터나 외부 가격 정보를 사용하여 이 숫자를 수정하지 마라.
-2. 모든 밸류에이션 계산과 리포트 작성은 오직 사용자가 입력한 가격(${body.currentPrice})을 기준으로 수행하라.
-3. 매수/매도, 분할 매수와 같은 직접적인 투자 행동 제안은 절대 하지 말고, 오직 시장의 객관적 상태와 데이터 분석만 제공할 것.
-`.trim();
-      userPrompt = `
-[분석 대상 데이터]
-- 종목: ${body.ticker}
-- 기준 현재가: ${body.currentPrice} (이 숫자를 100% 신뢰하고 분석할 것)
-- 입력 지표: PER ${body.manualPer}, ROE ${body.manualRoe}, PBR ${body.manualPbr}, PSR ${body.manualPsr}
-
-위 데이터를 바탕으로 정밀 심층 리포트를 작성하라.
-`.trim();
+      systemPrompt = "너는 주식 분석 전문가다. 지표를 보고 심층 리포트를 작성하라. 매수/매도 제안 대신 객관적 데이터 분석만 제공할 것.";
+      userPrompt = `종목: ${body.ticker}, 가격: ${body.currentPrice}, PER: ${body.manualPer}, ROE: ${body.manualRoe}, PBR: ${body.manualPbr}, PSR: ${body.manualPsr}.`;
     }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -251,7 +239,7 @@ export async function POST(req: Request) {
       cache: "no-store",
       body: JSON.stringify({
         model: model,
-        temperature: 0.1, // 가격 정확도를 위해 온도를 더 낮춤
+        temperature: 0.35,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -262,11 +250,13 @@ export async function POST(req: Request) {
     const { raw, data } = await parseOpenAIResponse(res);
 
     if (!res.ok) {
-      const msg = data?.error?.message || (raw ? raw.slice(0, 400) : "OpenAI 응답 오류");
+      const msg = data?.error?.message || (raw ? raw.slice(0, 400) : "OpenAI 응답이 비어 있습니다.");
       return jsonResponse({ ok: false, text: `OpenAI 에러 (${res.status}): ${msg}` }, 500);
     }
 
     const text = data?.choices?.[0]?.message?.content;
+    
+    // 프론트엔드 호환성을 위해 content와 text 모두 포함하여 응답
     return jsonResponse({ ok: true, text, content: text }, 200);
 
   } catch (e: any) {
