@@ -66,6 +66,18 @@ export default function UpgradePage() {
     if (rawHistory) setHistory(JSON.parse(rawHistory).slice(0, FREE_HISTORY_LIMIT));
   }, []);
 
+  // 🔄 입력 리셋 기능 추가
+  const handleReset = () => {
+    setTicker("");
+    setManualData({ per: "", roe: "", pbr: "", psr: "" });
+    setPortfolio([]);
+    setNewStock({ ticker: "", weight: "" });
+    setResult("");
+    setMatchingResult(null);
+    setPreviewUrl(null);
+    setUploadStatus("");
+  };
+
   const saveToHistory = (item: any) => {
     const newHistory = [item, ...history].slice(0, FREE_HISTORY_LIMIT);
     setHistory(newHistory);
@@ -163,7 +175,6 @@ export default function UpgradePage() {
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
-        // ✅ [수정] data.matchRate가 0일 때도 0%로 정확히 표시되도록 수정
         const rate = (data.matchRate !== undefined && data.matchRate !== null) ? data.matchRate : 0;
         currentMatch = { 
           expertName: sel?.name, 
@@ -201,7 +212,8 @@ export default function UpgradePage() {
           {!previewUrl ? (
             <div style={{ padding: "20px 0" }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>📸</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#2563eb" }}>스크린샷 자동 입력</div>
+              {/* ✅ [수정] 안내 문구 변경 */}
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#2563eb" }}>현재 고수비교는 지원하지 않습니다</div>
             </div>
           ) : (
             <div style={{ position: "relative", width: "fit-content", margin: "0 auto" }}>
@@ -261,14 +273,21 @@ export default function UpgradePage() {
         )}
       </section>
 
-      <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16, marginBottom: 20 }}>
-        {loading ? "AI 분석 중..." : "분석 시작하기"}
-      </button>
+      {/* ✅ [수정] 리셋 버튼과 분석 버튼을 감싸는 컨테이너 추가 */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+        <button onClick={handleReset} style={{ flex: 1, padding: "16px", borderRadius: 16, background: "#f3f4f6", color: "#111827", fontWeight: 900, border: "none", fontSize: 16 }}>초기화</button>
+        <button onClick={handleSubmit} disabled={loading} style={{ flex: 2, padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16 }}>
+          {loading ? "AI 분석 중..." : "분석 시작하기"}
+        </button>
+      </div>
 
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
           <div style={{ fontSize: 20, fontWeight: 900 }}>{matchingResult.expertName} 일치도 {matchingResult.matchRate}%</div>
+          {/* ✅ [수정] 점수 하단 빨간색 경고 문구 추가 */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#ef4444", marginTop: 4 }}>현재 점수는 제대로 나오지 않습니다</div>
+          
           <div style={{ fontSize: 48, margin: "12px 0" }}>{matchingResult.emoji}</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={async () => {
@@ -284,7 +303,6 @@ export default function UpgradePage() {
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
           <div className="markdown-body" style={{ color: "#1f2937" }}>
             <ReactMarkdown components={{
-              // ✅ [수정] 가독성 향상을 위해 여백과 구분 스타일 대폭 강화
               h2: ({node, ...props}) => <h2 style={{fontSize: '20px', fontWeight: 800, marginTop: '32px', marginBottom: '16px', color: '#111827', borderBottom: '2px solid #f3f4f6', paddingBottom: '10px'}} {...props} />,
               h3: ({node, ...props}) => <h3 style={{fontSize: '17px', fontWeight: 800, marginTop: '24px', marginBottom: '12px', color: '#1f2937'}} {...props} />,
               p: ({node, ...props}) => <p style={{marginBottom: '20px', color: '#374151', letterSpacing: '-0.01em', lineHeight: '1.9'}} {...props} />,
