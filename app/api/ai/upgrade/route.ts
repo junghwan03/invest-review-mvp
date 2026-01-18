@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// ✅ 토스 빌드 시 정적 HTML(index.html) 생성을 강제하기 위한 설정
+export const dynamic = "force-static";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -136,6 +139,9 @@ export async function POST(req: Request) {
 
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
+
+    // 🎯 [추가] JSON 코드 블록 기호 제거 (The string did not match... 에러 방지)
+    text = text.replace(/```json|```/g, "").trim();
 
     // 🎯 HEALTH_SCORE 추출 및 본문에서 제거
     let matchRate = 20; 
