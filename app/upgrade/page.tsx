@@ -29,7 +29,6 @@ const EXPERTS = [
 const HISTORY_KEY = "analysis_history_v1";
 const FREE_HISTORY_LIMIT = 10;
 
-// 유틸리티 함수
 function formatDateTime(ts: number) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -49,7 +48,6 @@ export default function UpgradePage() {
   const [result, setResult] = useState("");
   const [alertMsg, setAlertMsg] = useState("");
   const [isAlertOpen, setIsAlertOpen] = useState(false);
-
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState("");
   const [matchingResult, setMatchingResult] = useState<any>(null);
@@ -81,7 +79,7 @@ export default function UpgradePage() {
     setCurrentPrice(h.currentPrice || ""); 
     setResult(h.result); 
     setMatchingResult(h.matchingResult || null);
-    if (h.manualData) { setManualData(h.manualData); }
+    if (h.manualData) setManualData(h.manualData);
     if (h.portfolio) setPortfolio(h.portfolio);
     showAlert("이전 기록을 불러왔습니다.");
   };
@@ -111,8 +109,7 @@ export default function UpgradePage() {
           if (item.weight && item.weight !== "N/A") {
             setMode("portfolio"); setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
           } else {
-            setMode("single"); 
-            setTicker(item.ticker.toUpperCase());
+            setMode("single"); setTicker(item.ticker.toUpperCase());
             if (item.price) setCurrentPrice(String(item.price));
             setManualData({ per: item.per || "", roe: item.roe || "", pbr: item.pbr || "", psr: item.psr || "" });
           }
@@ -121,66 +118,33 @@ export default function UpgradePage() {
     };
   };
 
-  const onShareOrCopy = async () => {
-    if (!result) return;
-    const shareText = `[AI 투자 심층 분석 리포트]\n\n종목: ${ticker || "포트폴리오"}\n\n${result}`;
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try { await navigator.share({ title: "AI 투자 분석", text: shareText }); return; } catch (err) { console.log("공유 취소됨"); }
-    }
-    await copyText(shareText);
-    showAlert("분석 내용이 복사되었습니다!");
-  };
-
   const handleSubmit = async () => {
-    if (mode === "single" && (!ticker.trim() || !currentPrice.trim())) {
-      return showAlert("종목명과 현재가를 입력해주세요.");
-    }
-
+    if (mode === "single" && (!ticker.trim() || !currentPrice.trim())) return showAlert("종목명과 현재가를 입력해주세요.");
     setLoading(true); setResult(""); setMatchingResult(null);
     try {
-      // ✅ 전송 전 데이터 가공 (Trim 및 대문자화)
       const payload = mode === "single" 
-        ? { 
-            ticker: ticker.trim().toUpperCase(), 
-            currentPrice: currentPrice.trim(), 
-            manualPer: manualData.per, 
-            manualRoe: manualData.roe, 
-            manualPbr: manualData.pbr, 
-            manualPsr: manualData.psr 
-          } 
+        ? { ticker: ticker.trim().toUpperCase(), currentPrice: currentPrice.trim(), manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } 
         : { type: "comparison", portfolio, expertId: selectedExpert };
-
-      const res = await fetch("/api/ai/upgrade", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
+      const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       const content = data.text || data.content || (typeof data === 'string' ? data : "");
-      
-      if (!content) throw new Error("분석 내용을 가져오지 못했습니다.");
+      if (!content) throw new Error("데이터 없음");
       setResult(content);
-      
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
         currentMatch = { expertName: sel?.name, matchRate: Math.floor(Math.random() * 15) + 82, emoji: sel?.emoji };
         setMatchingResult(currentMatch);
       }
-
-      saveToHistory({
-        id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`,
-        currentPrice: mode === "single" ? currentPrice : null,
-        result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch
-      });
-
-    } catch { setResult("🚨 분석 중 오류 발생"); } finally { setLoading(false); }
+      saveToHistory({ id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`, currentPrice: mode === "single" ? currentPrice : null, result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch });
+    } catch { setResult("🚨 오류 발생"); } finally { setLoading(false); }
   };
 
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "16px", boxSizing: "border-box" }}>
       <AlertModal isOpen={isAlertOpen} message={alertMsg} onClose={() => setIsAlertOpen(false)} />
 
+      {/* 헤더 버튼 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
         <button onClick={() => window.location.href = '/'} style={{ padding: "16px 12px", borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff", textAlign: "left" }}>
           <div style={{ fontSize: 20 }}>📝</div>
@@ -193,8 +157,9 @@ export default function UpgradePage() {
       </div>
 
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>AI 투자 심층 분석</h1>
-      <p style={{ color: "#6b7280", marginTop: 0, fontSize: 13, marginBottom: 20 }}>종목/포트폴리오 정밀 진단 리포트</p>
+      <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>종목/포트폴리오 정밀 진단 리포트</p>
 
+      {/* 스크린샷 업로드 영역 */}
       <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center" }}>
         <label style={{ cursor: "pointer", display: "block" }}>
           {!previewUrl ? (
@@ -211,8 +176,14 @@ export default function UpgradePage() {
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} />
         </label>
         {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>}
+        
+        {/* ✅ 고수 비교 미지원 안내 (빨간색) */}
+        <p style={{ marginTop: 12, fontSize: 11, color: "#ef4444", fontWeight: 700 }}>
+          * 고수 비교(포트폴리오)는 아직 스크린샷 인식을 지원하지 않습니다.
+        </p>
       </section>
 
+      {/* 모드 전환 */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["single", "portfolio"].map((m) => (
           <button key={m} onClick={() => setMode(m as any)} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: mode === m ? "#111827" : "#fff", color: mode === m ? "#fff" : "#111827", fontWeight: 800 }}>
@@ -221,15 +192,27 @@ export default function UpgradePage() {
         ))}
       </div>
 
+      {/* 입력 섹션 */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", marginBottom: 20 }}>
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
             <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="종목명 (예: TSLA)" style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #e5e7eb", fontWeight: 700, boxSizing: "border-box" }} />
             <input value={currentPrice} onChange={(e) => setCurrentPrice(e.target.value)} placeholder="현재가 (예: 225)" style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #e5e7eb", fontWeight: 700, boxSizing: "border-box" }} />
+            
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {["per", "roe", "pbr", "psr"].map((k) => (
-                <div key={k} style={{ position: "relative" }}>
-                  <input placeholder={k.toUpperCase()} type="number" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} value={(manualData as any)[k]} onChange={e => setManualData({...manualData, [k]: e.target.value})} />
+                <div key={k} style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <input
+                    placeholder={k.toUpperCase()}
+                    type="number"
+                    style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }}
+                    value={(manualData as any)[k]}
+                    onChange={e => setManualData({...manualData, [k]: e.target.value})}
+                  />
+                  {/* ✅ 단위 (배, %) 추가 */}
+                  <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>
+                    {(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -260,13 +243,14 @@ export default function UpgradePage() {
         )}
       </section>
 
+      {/* 실행 버튼 */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         <button onClick={handleSubmit} disabled={loading} style={{ flex: 1, padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16 }}>
           {loading ? "AI 분석 중..." : "분석 시작하기"}
         </button>
-        <button onClick={onShareOrCopy} disabled={!result} style={{ padding: "16px", borderRadius: 16, border: "1px solid #111827", background: "white", fontWeight: 900 }}>📤 공유</button>
       </div>
 
+      {/* 매칭 결과 카드 */}
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
@@ -279,12 +263,14 @@ export default function UpgradePage() {
         </section>
       )}
 
+      {/* 분석 결과 텍스트 */}
       {result && (
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.7, marginBottom: 20 }}>
           <ReactMarkdown>{result}</ReactMarkdown>
         </section>
       )}
 
+      {/* 기록 섹션 */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 분석 기록</h2>
