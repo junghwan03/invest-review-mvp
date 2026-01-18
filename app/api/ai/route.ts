@@ -169,8 +169,31 @@ async function parseOpenAIResponse(res: Response) {
   return { raw, data: null as any };
 }
 
+// ✅ 숫자 파싱(문자열/number 모두 허용), 실패하면 null
+function parseNumberOrNull(v: any): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string") {
+    const s = v.trim().replace(/,/g, "");
+    if (!s) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+// ✅ “입력가”를 텍스트에 고정해서 박는 메타 라인
+function prependFixedPriceMeta(text: string, ticker: string, inputPrice: number) {
+  const meta = `입력 가격 $${inputPrice} 기준 분석 결과 (${ticker})`;
+  const trimmed = (text ?? "").trim();
+  if (!trimmed) return meta;
+  // 이미 포함돼 있으면 중복 방지
+  if (trimmed.includes(`$${inputPrice}`) && trimmed.includes("입력 가격")) return trimmed;
+  return `${meta}\n\n${trimmed}`;
+}
+
 // =========================================================
-// 🚀 [통합 수정본] POST 함수: 기능별 최적화 및 사용자 가격 절대 복종
+// 🚀 POST
 // =========================================================
 export async function POST(req: Request) {
   try {
@@ -178,62 +201,104 @@ export async function POST(req: Request) {
     if (!body) return jsonResponse({ ok: false, text: "데이터가 없습니다." }, 400);
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return jsonResponse({ ok: false, text: "API Key 미설정" }, 500);
-    }
+    if (!apiKey) return jsonResponse({ ok: false, text: "API Key 미설정" }, 500);
 
-    let model = "gpt-4o-mini"; 
+    let model = "gpt-4o-mini";
     let systemPrompt = "";
-    let userPrompt: any = ""; 
-    let temp = 0.3; // 기본 온도 (복기 로직용)
+    let userPrompt: any = "";
+    let temp = 0.3;
 
-    // --- [분기 1] 비전 분석 (스크린샷 인식) ---
+    // --- [분기 1] 비전 분석 ---
     if (body.type === "vision" && body.imageBase64) {
-      model = "gpt-4o"; 
-      temp = 0; 
+      model = "gpt-4o";
+      temp = 0;
       systemPrompt = "주식 데이터 추출 전문가. JSON으로만 응답하라.";
       userPrompt = [
         { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight(비중%) 추출." },
-        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
+        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } },
       ];
-    } 
-    // --- [분기 2] 고수 비교 분석 (Comparison) ---
+    }
+    // --- [분기 2] 비교 분석 ---
     else if (body.type === "comparison") {
       const experts: any = {
-        warren_buffett: "워런 버핏", nancy_pelosi: "낸시 펠로시", cathie_wood: "캐시 우드",
-        ray_dalio: "레이 달리오", michael_burry: "마이클 버리", korean_top1: "한국 1% 고수"
+        warren_buffett: "워런 버핏",
+        nancy_pelosi: "낸시 펠로시",
+        cathie_wood: "캐시 우드",
+        ray_dalio: "레이 달리오",
+        michael_burry: "마이클 버리",
+        korean_top1: "한국 1% 고수",
       };
       systemPrompt = `너는 ${experts[body.expertId] || "투자 고수"}다. 사용자의 포트폴리오를 냉철하게 분석하라.`;
       userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언을 작성하라.`;
-      temp = 0.35; 
-    } 
-    // --- [분기 3] 매매 복기 (Trade Review) ---
+      temp = 0.35;
+    }
+    // --- [분기 3] 매매 복기 ---
     else if (body.tradeType) {
       const tradeType = normalizeTradeType(body.tradeType);
       systemPrompt = getInstruction(tradeType);
-      userPrompt = `[매매유형] ${tradeType} [종목] ${String(body.ticker ?? "").toUpperCase()} [진입가] ${body.entryPrice ?? ""} [메모] ${body.reasonNote ?? ""}`.trim();
+      userPrompt = `
+[매매유형] ${tradeType}
+[종목] ${String(body.ticker ?? "").toUpperCase()}
+[진입가] ${body.entryPrice ?? ""}
+[손절가] ${body.stopLoss ?? "N/A"}
+[메모]
+${body.reasonNote ?? ""}
+      `.trim();
     }
-    // --- [분기 4] 종목 심층 분석 (사용자 가격 절대 고정 로직) ---
+    // --- [분기 4] 종목 심층 분석 (입력 가격 절대 고정) ---
     else {
-      // ✅ Netflix undefined 방지 및 Tesla 가격 고정 강화
-      const ticker = (body.ticker || "Unknown").toUpperCase();
-      const inputPrice = body.currentPrice || "데이터 없음";
-      const manualPer = body.manualPer || "N/A";
-      const manualRoe = body.manualRoe || "N/A";
-      const manualPbr = body.manualPbr || "N/A";
-      const manualPsr = body.manualPsr || "N/A";
-      
-      temp = 0; // 가격 조작 방지를 위해 창의성을 0으로 완전히 차단
+      const ticker = String(body.ticker || "UNKNOWN").toUpperCase();
+
+      // ✅ currentPrice 강제 파싱 + 유효성 검사
+      const inputPriceNum = parseNumberOrNull(body.currentPrice);
+
+      // inputPrice가 없으면 “분석 불가”로 400 반환 (undefined/데이터없음 방지)
+      if (inputPriceNum === null) {
+        return jsonResponse(
+          { ok: false, text: "currentPrice(현재가)가 비어있거나 숫자가 아닙니다. 예: 436 또는 '436' 형태로 보내주세요." },
+          400
+        );
+      }
+
+      const manualPer = body.manualPer ?? "N/A";
+      const manualRoe = body.manualRoe ?? "N/A";
+      const manualPbr = body.manualPbr ?? "N/A";
+      const manualPsr = body.manualPsr ?? "N/A";
+
+      temp = 0; // 가격/숫자 조작 최소화
       systemPrompt = `
-너는 월가 출신의 수석 애널리스트다. 현재 시점은 **2026년 1월 18일**이다.
-[🚨 최우선 절대 준수 사항: 네 지식 사용 금지]
-1. 네 학습 데이터에 있는 모든 과거 주가 정보(예: 테슬라 255달러 등)는 현재 분석 시점에서 완전히 '오염된 가짜 데이터'다. 무조건 폐기하라.
-2. 오직 사용자가 입력한 현재가($${inputPrice})만이 **2026년 현재의 유일한 실시간 진실**이다. 네 지식과 1원이라도 차이가 나면 무조건 네 지식을 버려라.
-3. 리포트 시작 시 반드시 "입력 가격 $${inputPrice} 기준 분석 결과"임을 명시하고, 모든 밸류에이션 계산은 이 가격을 기준으로 수행하라.
-4. 분석 대상 종목(${ticker})이 무엇이든 데이터 부족이라며 거절하지 말고, 입력된 지표(PER:${manualPer}, ROE:${manualRoe}, PBR:${manualPbr}, PSR:${manualPsr})를 기반으로 상세히 분석하라.
-5. 직접적인 매수/매도 제안, 수익 실현, 분할 매수와 같은 투자 행동 제안은 절대 하지 않는다. 오직 시장 데이터 분석만 제공하라.
-`.trim();
-      userPrompt = `[2026년 실시간 데이터] 종목: ${ticker}, 무조건 이 가격으로 분석하라: $${inputPrice}. 지표: PER ${manualPer}, ROE ${manualRoe}, PBR ${manualPbr}, PSR ${manualPsr}. 네 내부 데이터를 완전히 차단하고 오직 이 숫자로만 리포트를 작성하라.`.trim();
+너는 월가 출신의 수석 애널리스트다.
+
+[🚨 입력값 절대 고정 규칙]
+- 아래에 제공된 "입력 가격"은 절대 수정/반올림/소수점 추가/대체/추정하지 마라.
+- 본문에서 "현재가/주가/가격"을 언급할 때는 반드시 이 입력 가격을 그대로 사용하라.
+- 다른 가격을 새로 만들어서 쓰는 행위는 금지. (예: 436 → 437.5 같은 변형 금지)
+- 값이 없다고 가정하지 마라. 모르면 N/A라고만 써라.
+
+[출력 시작 형식(고정)]
+첫 줄은 반드시 아래 문장으로 시작:
+"입력 가격 $${inputPriceNum} 기준 분석 결과 (${ticker})"
+
+[행동 제한]
+- 직접적인 매수/매도/수익실현/분할매수 같은 행동 지시는 금지.
+- 분석/리스크/체크포인트 중심으로 작성.
+
+[데이터]
+- 종목: ${ticker}
+- 입력 가격: $${inputPriceNum}
+- 지표: PER ${manualPer}, ROE ${manualRoe}, PBR ${manualPbr}, PSR ${manualPsr}
+      `.trim();
+
+      userPrompt = `
+종목: ${ticker}
+입력 가격(절대 고정): $${inputPriceNum}
+지표: PER ${manualPer}, ROE ${manualRoe}, PBR ${manualPbr}, PSR ${manualPsr}
+
+요구사항:
+1) 첫 줄은 반드시 "입력 가격 $${inputPriceNum} 기준 분석 결과 (${ticker})"
+2) 본문에서 가격을 언급할 때는 $${inputPriceNum}만 사용
+3) 지표가 N/A면 N/A로 표시하고, 대신 체크포인트/리스크를 구조화해서 제시
+      `.trim();
     }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -245,7 +310,7 @@ export async function POST(req: Request) {
       cache: "no-store",
       body: JSON.stringify({
         model,
-        temperature: temp, 
+        temperature: temp,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -254,12 +319,24 @@ export async function POST(req: Request) {
     });
 
     const { raw, data } = await parseOpenAIResponse(res);
-    if (!res.ok) return jsonResponse({ ok: false, text: `API 에러: ${data?.error?.message || "오류"}` }, 500);
+    if (!res.ok) {
+      const msg = data?.error?.message || raw?.slice(0, 400) || "오류";
+      return jsonResponse({ ok: false, text: `API 에러: ${msg}` }, 500);
+    }
 
-    const text = data?.choices?.[0]?.message?.content;
+    let text = data?.choices?.[0]?.message?.content ?? "";
+
+    // ✅ 심층분석 분기에서만: 첫 줄 메타를 서버가 강제로 박아 넣음(혹시 모델이 빼먹어도 고정)
+    if (!body.type && !body.tradeType) {
+      const ticker = String(body.ticker || "UNKNOWN").toUpperCase();
+      const inputPriceNum = parseNumberOrNull(body.currentPrice);
+      if (inputPriceNum !== null) {
+        text = prependFixedPriceMeta(text, ticker, inputPriceNum);
+      }
+    }
+
     return jsonResponse({ ok: true, text, content: text }, 200);
-
   } catch (e: any) {
-    return jsonResponse({ ok: false, text: `서버 오류: ${e.message}` }, 500);
+    return jsonResponse({ ok: false, text: `서버 오류: ${String(e?.message ?? e)}` }, 500);
   }
 }
