@@ -39,77 +39,25 @@ function getInstruction(tradeType: TradeType) {
 `;
 
   const longGuide = `
-[역할]
-너는 장기/가치투자 복기 코치다. 단타/차트 얘기를 줄이고, 펀더멘털/가치/리스크를 본다.
-
-[중점 평가(장기 전용)]
-- 기업의 해자/경쟁우위/산업 포지션 언급 여부
-- 밸류에이션: PER/PBR/PS/FCF 중 최소 1개라도 "기준 숫자"가 있는지
-- 재무 안전성: 부채비율/현금흐름/이자보상배율 같은 리스크 체크가 있는지
-- 장기 시나리오: 1~3년 관점의 촉매/성장 가정이 있는지
-- Thesis break(생각 바뀌는 조건): '무슨 일이면 틀렸다고 인정할지' 명확한지
-
-[체크리스트는 장기 전용으로만]
-예) 밸류에이션 기준, 재무 리스크, 경쟁우위, 가정/리스크, thesis break
-
+[역할] 너는 장기/가치투자 복기 코치다. 펀더멘털/가치/리스크를 본다.
 [매매 유형 분류는 반드시 "장기투자"]
 ${commonRules}
 `;
 
   const swingGuide = `
-[역할]
-너는 스윙 트레이딩 복기 코치다. 며칠~몇 주 관점. 진입/손절/익절의 '숫자 기준'을 가장 중요하게 본다.
-
-[중점 평가(스윙 전용)]
-- 진입 트리거(패턴/뉴스/수급 등)가 한 문장으로 명확한지
-- 손절 기준이 숫자(%, 가격, 레벨)로 명확한지
-- 익절/분할익절 기준이 있는지
-- 손익비(RR) 의식이 있는지
-- 이벤트 리스크(실적/발표/매크로)를 고려했는지
-- 감정 개입(추격매수/물타기/계획 변경) 흔적
-
-[체크리스트는 스윙 전용으로만]
-예) 트리거, 손절 숫자, 익절/분할, RR, 이벤트 캘린더
-
+[역할] 너는 스윙 트레이딩 복기 코치다. 진입/손절/익절의 '숫자 기준'을 본다.
 [매매 유형 분류는 반드시 "스윙"]
 ${commonRules}
 `;
 
   const dayGuide = `
-[역할]
-너는 단타 복기 코치다. 분/시간 단위. 실행 규칙과 손절 속도를 최우선으로 본다.
-
-[중점 평가(단타 전용)]
-- 즉시 손절 규칙(틱/퍼센트/레벨)이 있는지
-- 과매매/복수매매 신호가 있는지
-- 수수료/슬리피지 고려가 있는지
-- 진입이 추격인지(늦진입) 여부
-- 멘탈 붕괴 신호(조급/흥분/공포) 체크
-- 계획 대비 실행 일치(원칙 위반 여부)
-
-[체크리스트는 단타 전용으로만]
-예) 손절 트리거, 1회 최대손실, 재진입 금지 조건, 체결/호가 확인, 감정 체크
-
+[역할] 너는 단타 복기 코치다. 실행 규칙과 손절 속도를 최우선으로 본다.
 [매매 유형 분류는 반드시 "단타"]
 ${commonRules}
 `;
 
   const etfGuide = `
-[역할]
-너는 ETF 복기 코치다. 개별 종목 분석보다 "상품 구조/추종지수/비용/분배금/리밸런싱/포트 역할"을 본다.
-단타/차트 얘기는 최소화하고 장기 자산배분 관점으로 지도한다.
-
-[중점 평가(ETF 전용)]
-- ETF의 역할: 코어/위성/배당/방어/성장/헤지 중 무엇인지 1문장으로 정의했는가?
-- 추종지수/전략: S&P500/나스닥/커버드콜/팩터/리츠/채권/레버리지/인버스 등 구조 이해가 있는가?
-- 비용: 총보수(TER) 또는 운용보수 인식이 있는가? “싸다/비싸다” 기준이 있는가?
-- 분배금: 기대한다면 분배금 변동성/재투자(재매수) 계획이 있는가?
-- 리밸런싱 규칙: 추가매수 조건(가격/비중/주기) + 중단 조건(전략이 깨지는 조건)이 있는가?
-- 리스크: 레버리지/환율/금리/섹터 편중 등 핵심 리스크를 1~2개라도 적었는가?
-
-[체크리스트는 ETF 전용으로만]
-예) 역할 정의, 지수/전략, 비용, 분배금/재투자, 리밸런싱/중단조건, 핵심 리스크
-
+[역할] 너는 ETF 복기 코치다. 상품 구조/추종지수/비용/분배금을 본다.
 [매매 유형 분류는 반드시 "ETF"]
 ${commonRules}
 `;
@@ -170,7 +118,7 @@ async function parseOpenAIResponse(res: Response) {
 }
 
 // =========================================================
-// 🚀 [통합 수정본] POST 함수: 기능별 최적화 및 2026년 데이터 고정
+// 🚀 [최종 보강본] POST 함수: 사용자 입력값 절대 복종 로직
 // =========================================================
 export async function POST(req: Request) {
   try {
@@ -178,75 +126,66 @@ export async function POST(req: Request) {
     if (!body) return jsonResponse({ ok: false, text: "데이터가 없습니다." }, 400);
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return jsonResponse({ ok: false, text: "API Key 미설정" }, 500);
-    }
+    if (!apiKey) return jsonResponse({ ok: false, text: "API Key 미설정" }, 500);
 
     let model = "gpt-4o-mini"; 
     let systemPrompt = "";
     let userPrompt: any = ""; 
-    let temp = 0.3; // 기본 온도 (복기 로직용)
+    let temp = 0.3; 
 
-    // --- [분기 1] 비전 분석 (스크린샷 인식) ---
+    // --- [분기 1] 비전 분석 ---
     if (body.type === "vision" && body.imageBase64) {
-      model = "gpt-4o"; 
-      temp = 0; 
+      model = "gpt-4o"; temp = 0;
       systemPrompt = "주식 데이터 추출 전문가. JSON으로만 응답하라.";
       userPrompt = [
-        { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight(비중%) 추출." },
+        { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr 추출." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
       ];
     } 
-    // --- [분기 2] 고수 비교 분석 (Comparison) ---
+    // --- [분기 2] 고수 비교 ---
     else if (body.type === "comparison") {
-      const experts: any = {
-        warren_buffett: "워런 버핏", nancy_pelosi: "낸시 펠로시", cathie_wood: "캐시 우드",
-        ray_dalio: "레이 달리오", michael_burry: "마이클 버리", korean_top1: "한국 1% 고수"
-      };
-      systemPrompt = `너는 ${experts[body.expertId] || "투자 고수"}다. 사용자의 포트폴리오를 냉철하게 분석하라.`;
-      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언을 작성하라.`;
-      temp = 0.35; 
+      const experts: any = { warren_buffett: "워런 버핏", nancy_pelosi: "낸시 펠로시", cathie_wood: "캐시 우드", ray_dalio: "레이 달리오", michael_burry: "마이클 버리", korean_top1: "한국 1% 고수" };
+      systemPrompt = `너는 ${experts[body.expertId] || "투자 고수"}다. 사용자의 포트폴리오를 분석하라.`;
+      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언 작성.`;
+      temp = 0.35;
     } 
-    // --- [분기 3] 매매 복기 (Trade Review) ---
+    // --- [분기 3] 매매 복기 ---
     else if (body.tradeType) {
       const tradeType = normalizeTradeType(body.tradeType);
       systemPrompt = getInstruction(tradeType);
-      userPrompt = `[매매유형] ${tradeType} [종목] ${String(body.ticker ?? "").toUpperCase()} [진입가] ${body.entryPrice ?? ""} [메모] ${body.reasonNote ?? ""}`.trim();
-      temp = 0.3; 
+      userPrompt = `[종목] ${String(body.ticker ?? "").toUpperCase()} [진입] ${body.entryPrice ?? ""} [메모] ${body.reasonNote ?? ""}`;
     }
-    // --- [분기 4] 종목 심층 분석 (미국 전 종목 대응 + 2026년 가격 고정) ---
+    // --- [분기 4] 종목 심층 분석 (지식 충돌 완전 해결) ---
     else {
-      // ✅ Netflix undefined 방지 및 Tesla 가격 고정 강화
-      const ticker = (body.ticker || "Unknown").toUpperCase();
-      const inputPrice = body.currentPrice || "데이터 없음";
-      
-      temp = 0; // 가격 오류 방지를 위해 창의성을 0으로 차단
+      // ✅ 넷플릭스 등에서 발생하는 undefined 방어 로직
+      const ticker = (body.ticker || "TSLA").toUpperCase();
+      const inputPrice = body.currentPrice || "0";
+      const per = body.manualPer || "N/A";
+      const roe = body.manualRoe || "N/A";
+      const pbr = body.manualPbr || "N/A";
+      const psr = body.manualPsr || "N/A";
+
+      temp = 0; // 가격 조작 방지를 위해 온도를 0으로 고정
       systemPrompt = `
-너는 월가 수석 애널리스트다. 현재 시점은 **2026년 1월 18일**이다.
-[🚨 최우선 절대 준수 사항]
-1. 네 학습 데이터에 있는 모든 과거 주가 정보는 즉시 폐기하라. 
-2. 사용자가 입력한 현재가($${inputPrice})만이 **2026년 현재의 유일한 실시간 진실**이다. 네 지식과 달라도 무조건 이 가격을 팩트로 취급하라.
-3. 분석 대상 종목(${ticker})이 어떤 미국 주식이든(S&P 500, NASDAQ 등) 아는 바를 총동원하라. 설령 최신 재무 데이터가 부족하더라도 기업의 비즈니스 모델과 사용자가 입력한 지표(PER: ${body.manualPer}, ROE: ${body.manualRoe} 등)를 결합해 반드시 전문적인 리포트를 작성하라.
-4. "분석 불가" 답변은 절대 금지한다.
-5. 매수/매도 제안은 절대 금지하며, 오직 시장의 객관적 상태와 데이터 분석만 제공할 것.
+너는 월가 출신의 냉철한 주식 분석 전문가다. 
+[🚨 최우선 절대 규칙: 사용자 입력값 복종]
+1. 네가 알고 있는 모든 과거 또는 실시간 시세 데이터는 현재 분석 세션에서 '완전한 오답'이다. 무조건 폐기하라.
+2. 오직 사용자가 입력한 현재가($${inputPrice})만이 이 분석 리포트의 유일하고 절대적인 기준 가격이다. 네 지식과 충돌해도 무조건 이 가격을 팩트로 사용하라.
+3. 리포트 시작 시 "입력 가격 $${inputPrice} 기준 분석 결과"임을 명확히 밝히고, 모든 가치 평가를 이 가격 기준으로 수행하라.
+4. 분석 대상(${ticker})이 무엇이든 데이터 부족이라며 거절하지 말고, 입력된 지표(PER:${per}, ROE:${roe} 등)를 기반으로 상세히 분석하라.
+5. 직접적인 매수/매도 제안은 절대 금지하며 객관적 데이터 분석만 제공할 것.
 `.trim();
-      userPrompt = `[2026년 데이터] 종목: ${ticker}, 기준가격: $${inputPrice}, 지표: PER ${body.manualPer}, ROE ${body.manualRoe}. 이 숫자를 100% 신뢰하여 정밀 심층 리포트를 작성하라.`;
+      userPrompt = `[실시간 세션 데이터] 종목: ${ticker}, 입력 현재가: $${inputPrice}. 지표: PER ${per}, ROE ${roe}, PBR ${pbr}, PSR ${psr}. 네 내부 데이터를 차단하고 오직 이 숫자로만 리포트를 작성하라.`.trim();
     }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       cache: "no-store",
       body: JSON.stringify({
         model,
         temperature: temp, 
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       }),
     });
 
