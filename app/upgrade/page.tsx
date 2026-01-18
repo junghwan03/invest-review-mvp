@@ -57,7 +57,7 @@ export default function UpgradePage() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [matchingResult, setMatchingResult] = useState<any>(null);
   const [ticker, setTicker] = useState("");
-  const [isManual, setIsManual] = useState(false);
+  const [currentPrice, setCurrentPrice] = useState(""); // 현재가 상태 추가
   const [manualData, setManualData] = useState({ per: "", roe: "", pbr: "", psr: "" });
   const [portfolio, setPortfolio] = useState<{ ticker: string; weight: number }[]>([]);
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
@@ -86,8 +86,12 @@ export default function UpgradePage() {
   };
 
   const loadHistoryItem = (h: any) => {
-    setMode(h.mode); setTicker(h.ticker || ""); setResult(h.result); setMatchingResult(h.matchingResult || null);
-    if (h.manualData) { setIsManual(true); setManualData(h.manualData); }
+    setMode(h.mode); 
+    setTicker(h.ticker || ""); 
+    setCurrentPrice(h.currentPrice || ""); // 현재가 복구
+    setResult(h.result); 
+    setMatchingResult(h.matchingResult || null);
+    if (h.manualData) { setManualData(h.manualData); }
     if (h.portfolio) setPortfolio(h.portfolio);
     showAlert("이전 기록을 불러왔습니다.");
   };
@@ -116,7 +120,9 @@ export default function UpgradePage() {
           if (item.weight && item.weight !== "N/A") {
             setMode("portfolio"); setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
           } else {
-            setMode("single"); setTicker(item.ticker); setIsManual(true);
+            setMode("single"); 
+            setTicker(item.ticker);
+            if (item.price) setCurrentPrice(item.price); // 스크린샷에서 가격 인식 시 자동 입력
             setManualData({ per: item.per || "", roe: item.roe || "", pbr: item.pbr || "", psr: item.psr || "" });
           }
         }
@@ -145,7 +151,9 @@ export default function UpgradePage() {
 
     setLoading(true); setResult(""); setMatchingResult(null);
     try {
-      const payload = mode === "single" ? { ticker, manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } : { type: "comparison", portfolio, expertId: selectedExpert };
+      const payload = mode === "single" 
+        ? { ticker, currentPrice, manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } 
+        : { type: "comparison", portfolio, expertId: selectedExpert };
       const res = await fetch("https://invest-review-mvp.vercel.app/api/ai/upgrade", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -163,6 +171,7 @@ export default function UpgradePage() {
 
       saveToHistory({
         id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker : `${portfolio.length}개 종목`,
+        currentPrice: mode === "single" ? currentPrice : null,
         result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch
       });
 
@@ -203,7 +212,7 @@ export default function UpgradePage() {
               </div>
             ) : (
               <>
-                <img src={previewUrl} style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }} />
+                <img src={previewUrl} style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }} alt="preview" />
                 {visionLoading && (
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.7)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⏳</div>
                 )}
@@ -215,6 +224,10 @@ export default function UpgradePage() {
         {uploadStatus && (
           <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>
         )}
+        {/* 고수 비교 안내 문구 추가 */}
+        <p style={{ marginTop: 12, fontSize: 11, color: "#ef4444", fontWeight: 700 }}>
+          * 고수 비교(포트폴리오)는 아직 스크린샷 인식을 지원하지 않습니다.
+        </p>
       </section>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
@@ -229,17 +242,20 @@ export default function UpgradePage() {
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
             <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="종목명 입력" style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #e5e7eb", fontWeight: 700, boxSizing: "border-box" }} />
-            <button onClick={() => setIsManual(!isManual)} style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", textDecoration: "underline", textAlign: "left" }}>지표 수동 입력</button>
-            {isManual && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {["per", "roe", "pbr", "psr"].map((k) => (
-                  <div key={k} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                    <input placeholder={k.toUpperCase()} type="number" style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} value={(manualData as any)[k]} onChange={e => setManualData({...manualData, [k]: e.target.value})} />
-                    <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>{(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            
+            {/* 현재가 입력란 (항상 펴둠) */}
+            <input value={currentPrice} onChange={(e) => setCurrentPrice(e.target.value)} placeholder="현재가 입력 (예: 750달러, 80000원)" style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #e5e7eb", fontWeight: 700, boxSizing: "border-box" }} />
+            
+            {/* 지표 수동 입력란 (항상 펴둠) */}
+            <p style={{ margin: "4px 0 0 0", fontSize: 12, color: "#6b7280", fontWeight: 600 }}>지표 수동 입력 (선택사항)</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {["per", "roe", "pbr", "psr"].map((k) => (
+                <div key={k} style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <input placeholder={k.toUpperCase()} type="number" style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} value={(manualData as any)[k]} onChange={e => setManualData({...manualData, [k]: e.target.value})} />
+                  <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>{(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}</span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 16 }}>
