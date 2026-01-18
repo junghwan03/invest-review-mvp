@@ -161,23 +161,35 @@ export default function UpgradePage() {
         if (!res.ok || !data.ok) throw new Error("인식 실패");
 
         const rawContent = data.text || data.content || "";
-        // ✅ [수정] JSON 코드 블록과 불필요한 텍스트를 제거하는 로직 추가
-        const jsonOnly = rawContent.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(jsonOnly);
+        
+        // ✅ [수술 포인트] 순수 JSON만 추출하는 강력한 정규식 및 파싱 로직
+        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("데이터 형식이 올바르지 않습니다.");
+        
+        const finalJson = jsonMatch[0];
+        const parsed = JSON.parse(finalJson);
         
         const item = parsed.extracted?.[0];
         if (item) {
           setUploadStatus("✅ 자동 입력 완료!");
           if (item.weight && item.weight !== "N/A") {
-            setMode("portfolio"); setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
+            setMode("portfolio"); 
+            setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
           } else {
-            setMode("single"); setTicker(item.ticker.toUpperCase());
-            setManualData({ per: item.per || "", roe: item.roe || "", pbr: item.pbr || "", psr: item.psr || "" });
+            setMode("single"); 
+            setTicker(item.ticker.toUpperCase());
+            setManualData({ 
+              per: item.per && item.per !== "N/A" ? item.per : "", 
+              roe: item.roe && item.roe !== "N/A" ? item.roe : "", 
+              pbr: item.pbr && item.pbr !== "N/A" ? item.pbr : "", 
+              psr: item.psr && item.psr !== "N/A" ? item.psr : "" 
+            });
           }
         } else {
           throw new Error("데이터 구조 오류");
         }
       } catch (err) { 
+        console.error("Vision Error:", err);
         setUploadStatus("❌ 분석 실패 (인식할 수 없는 이미지)");
         showAlert("이미지에서 지표를 읽지 못했습니다. 직접 입력하거나 다른 사진을 써주세요.");
       } finally { 
@@ -277,7 +289,7 @@ export default function UpgradePage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {["per", "roe", "pbr", "psr"].map((k) => (
                 <div key={k} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                  <input placeholder={k.toUpperCase()} type="number" style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} value={(manualData as any)[k]} onChange={e => setManualData({...manualData, [k]: e.target.value})} />
+                  <input placeholder={k.toUpperCase()} type="text" style={{ width: "100%", padding: "10px", paddingRight: "30px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 12, boxSizing: "border-box" }} value={(manualData as any)[k]} onChange={e => setManualData({...manualData, [k]: e.target.value})} />
                   <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>{(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}</span>
                 </div>
               ))}
