@@ -25,14 +25,32 @@ function normalizeTradeType(v: any): TradeType {
   return "long";
 }
 
-// ✅ [노선 1] 매매 복기 지시문
+// ✅ [노선 1] 매매 복기 지시문 (사용자 원본 100% 유지)
 function getInstruction(tradeType: TradeType) {
   const commonRules = `
 너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
 장황하지 않게, "기준/행동/숫자" 중심으로 쓴다.
 메모가 부실하면 "추가로 적어야 할 항목"을 구체적으로 요구한다.
-[점수 표기 규칙] 반드시 "N/10점" 형태로만 쓴다.
-[출력 형식 고정] 1) 한줄 총평, 2) 점수+근거, 3) 감정 경고, 4) 매매 유형, 5) 개선 액션, 6) 체크리스트
+
+[점수 표기 규칙 - 매우 중요]
+- 점수는 반드시 "N/10점" 형태로만 쓴다. (예: 7/10점, 10/10점)
+- "7점"처럼 분모가 없는 표기는 금지.
+- 0~10 사이 정수만 사용.
+
+[출력 형식 고정 - 형식 엄수]
+- 제목 1줄 (티커 포함)
+- 1) 한줄 총평 (최대 25자)
+- 2) 점수(각 항목 0~10점) + 한줄 근거 (반드시 N/10점 형식)
+  - 근거 작성 시 괄호 ()를 절대 사용하지 않고 문장으로만 작성한다.
+  - 근거명확성: N/10점 — 근거 한 줄
+  - 리스크관리: N/10점 — 근거 한 줄
+  - 감정통제: N/10점 — 근거 한 줄
+  - 일관성: N/10점 — 근거 한 줄
+- 3) 감정 경고: [있음/없음] — 근거 1줄 (괄호 사용 금지)
+- 4) 매매 유형 분류 (반드시 아래 값 중 하나로만 출력)
+  - 장기투자 / 스윙 / 단타 / ETF
+- 5) 개선 액션 3개 (각 1줄, 행동형)
+- 6) 다음 진입 체크리스트 5개 (체크박스 형태로 짧게)
 `;
   const longGuide = `[역할] 너는 장기/가치투자 복기 코치다. ${commonRules}`;
   const swingGuide = `[역할] 너는 스윙 트레이딩 복기 코치다. ${commonRules}`;
@@ -44,7 +62,7 @@ function getInstruction(tradeType: TradeType) {
   return etfGuide;
 }
 
-// ✅ [노선 2] 고수 비교 지시문
+// ✅ [노선 2] 고수 비교 지시문 (사용자 원본 100% 유지)
 function getDiagnosisInstruction(expertId: string) {
   const expertData: Record<string, string> = {
     warren_buffett: "정보기술 45%, 금융 30%, 소비재 15%, 에너지 10% (가치/현금흐름 중심)",
@@ -57,7 +75,7 @@ function getDiagnosisInstruction(expertId: string) {
   return `너는 '자산 배분 감사관'이다. HEALTH_SCORE: [숫자]%를 포함하라. 데이터: ${expertData[expertId] || expertData.warren_buffett}`;
 }
 
-// ✅ [노선 3] 심층 지표 분석 지시문
+// ✅ [노선 3] 심층 지표 분석 지시문 (사용자 원본 100% 유지)
 function getAnalysisInstruction() {
   return `너는 '지표 분석 애널리스트'다. 지정된 형식을 엄수하라. ## 🌐 산업 사이클 분석...`;
 }
@@ -82,11 +100,9 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     if (!body) return jsonResponse({ ok: false, text: "데이터 없음" }, 400);
 
-    // 1️⃣ 요청 타입 판별 (Vision 추가)
     const isAnalysis = body.type === "diagnosis" || body.type === "comparison" || body.type === "vision" || body.manualPer !== undefined;
     const currentType = isAnalysis ? "analysis" : "review";
 
-    // 2️⃣ 해당 타입의 횟수 체크
     if (USAGE_STORE[ip][currentType] >= DAILY_LIMIT_PER_TYPE) {
       const typeName = isAnalysis ? "심층 분석" : "매매 복기";
       return jsonResponse({ 
@@ -100,10 +116,10 @@ export async function POST(req: Request) {
     let systemPrompt = "";
     let userPrompt: any = "";
 
-    // 🚦 [수정] 스크린샷(Vision) 분기 로직 추가
+    // 🚦 [추가] 스크린샷(Vision) 인식 분기
     if (body.type === "vision" && body.imageBase64) {
       systemPrompt = `너는 증권사 앱 스크린샷 판독 전문가다. 이미지에서 지표를 추출해라.
-      [규칙] 1. 설명 없이 JSON만 출력. 2. 종목명, 비중, PER, ROE, PBR, PSR 추출. 3. 없으면 "N/A"`;
+      [규칙] 1. 설명 없이 JSON만 출력. 2. 종목명(ticker), 비중(weight), PER, ROE, PBR, PSR 추출. 3. 없으면 "N/A"`;
       userPrompt = [
         { type: "text", text: "이 이미지에서 주식 데이터를 추출해서 JSON으로 응답해라." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
@@ -112,18 +128,15 @@ export async function POST(req: Request) {
     else if (body.type === "diagnosis" || body.type === "comparison") {
       systemPrompt = getDiagnosisInstruction(body.expertId);
       userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석하라.`;
-    } 
-    else if (body.manualPer !== undefined) {
+    } else if (body.manualPer !== undefined) {
       systemPrompt = getAnalysisInstruction();
       userPrompt = `종목: ${body.ticker}, PER: ${body.manualPer}, ROE: ${body.manualRoe}, PBR: ${body.manualPbr}, PSR: ${body.manualPsr}. 분석하라.`;
-    } 
-    else {
+    } else {
       const tradeType = normalizeTradeType(body?.tradeType);
       systemPrompt = getInstruction(tradeType);
       userPrompt = `[종목] ${body.ticker} [진입가] ${body.entryPrice} [메모] ${body.reasonNote}`;
     }
 
-    // 3️⃣ OpenAI 호출 (모델은 Vision 지원하는 gpt-4o-mini 유지)
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -137,7 +150,6 @@ export async function POST(req: Request) {
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    // 스코어 추출 로직
     let matchRate = 20; 
     const scoreMatch = text.match(/HEALTH_SCORE[:\s\*]*(\d+)/i);
     if (scoreMatch) {
@@ -146,7 +158,6 @@ export async function POST(req: Request) {
     }
     matchRate = Math.max(20, Math.min(100, matchRate));
 
-    // 4️⃣ 성공 시 해당 타입 카운트만 증가
     USAGE_STORE[ip][currentType] += 1;
 
     return jsonResponse({ 
