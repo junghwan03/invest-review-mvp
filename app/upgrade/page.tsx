@@ -84,7 +84,6 @@ export default function UpgradePage() {
 
   const clearHistoryAll = () => { setHistory([]); localStorage.removeItem(HISTORY_KEY); };
 
-  // ✅ 결과 텍스트 공유 함수
   const shareAnalysisResult = async () => {
     const shareData = {
       title: "AI 투자 심층 분석 결과",
@@ -95,11 +94,10 @@ export default function UpgradePage() {
       try { await navigator.share(shareData); } catch (e) { showAlert("공유를 취소했습니다."); }
     } else {
       await copyText(`${shareData.text}\n\n결과 보기: ${shareData.url}`);
-      showAlert("공유 기능이 지원되지 않는 브라우저입니다. 분석 요약과 링크가 클립보드에 복사되었습니다.");
+      showAlert("공유 기능이 지원되지 않는 브라우저입니다.");
     }
   };
 
-  // ✅ 고수 매칭 리포트 이미지 공유 함수
   const shareMatchingReport = async () => {
     if (!matchingCardRef.current) return;
     try {
@@ -107,10 +105,10 @@ export default function UpgradePage() {
       canvas.toBlob(async (blob) => {
         if (!blob) return;
         const file = new File([blob], "match_report.png", { type: "image/png" });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: "고수 매칭 리포트", text: `${matchingResult.expertName} 일치도 ${matchingResult.matchRate}%!` });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: "고수 매칭 리포트" });
         } else {
-          await shareAnalysisResult(); // 파일 공유 안되면 텍스트 공유로 폴백
+          await shareAnalysisResult();
         }
       });
     } catch (e) { showAlert("이미지 생성 중 오류가 발생했습니다."); }
@@ -156,13 +154,15 @@ export default function UpgradePage() {
         : { type: "comparison", portfolio, expertId: selectedExpert };
       const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
-      const content = data.text || data.content || (typeof data === 'string' ? data : "");
+      const content = data.text || data.content || "";
       if (!content) throw new Error("데이터 없음");
       setResult(content);
+      
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
-        currentMatch = { expertName: sel?.name, matchRate: Math.floor(Math.random() * 15) + 82, emoji: sel?.emoji };
+        // ✅ [수정] 랜덤 숫자 대신 AI가 계산한 data.matchRate를 사용함
+        currentMatch = { expertName: sel?.name, matchRate: data.matchRate || 0, emoji: sel?.emoji };
         setMatchingResult(currentMatch);
       }
       saveToHistory({ id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`, result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch });
@@ -205,7 +205,6 @@ export default function UpgradePage() {
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} />
         </label>
         {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>}
-        <p style={{ marginTop: 12, fontSize: 11, color: "#ef4444", fontWeight: 700 }}>* 고수 비교(포트폴리오)는 아직 스크린샷 인식을 지원하지 않습니다.</p>
       </section>
 
       {/* 모드 전환 */}
@@ -264,28 +263,26 @@ export default function UpgradePage() {
         </button>
       </div>
 
-      {/* 매칭 결과 카드 (공유 버튼 추가) */}
+      {/* 매칭 결과 카드 */}
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
           <div style={{ fontSize: 20, fontWeight: 900 }}>{matchingResult.expertName} 일치도 {matchingResult.matchRate}%</div>
           <div style={{ fontSize: 48, margin: "12px 0" }}>{matchingResult.emoji}</div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <div style={{ display: "flex", gap: 8 }}>
             <button onClick={async () => {
               const canvas = await html2canvas(matchingCardRef.current!, { scale: 2 });
               const link = document.createElement("a"); link.href = canvas.toDataURL(); link.download = "result.png"; link.click();
             }} style={{ flex: 1, fontSize: 12, background: "#111827", color: "#fff", padding: "12px", borderRadius: 12, border: "none", fontWeight: 800 }}>이미지 저장</button>
-            {/* ✅ 공유 기능 추가 */}
             <button onClick={shareMatchingReport} style={{ flex: 1, fontSize: 12, background: "#2563eb", color: "#fff", padding: "12px", borderRadius: 12, border: "none", fontWeight: 800 }}>공유하기</button>
           </div>
         </section>
       )}
 
-      {/* 분석 결과 텍스트 (공유 버튼 추가) */}
+      {/* 분석 결과 텍스트 */}
       {result && (
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.7, marginBottom: 20 }}>
           <ReactMarkdown>{result}</ReactMarkdown>
-          {/* ✅ 텍스트 공유 버튼 추가 */}
           <button onClick={shareAnalysisResult} style={{ marginTop: 20, width: "100%", padding: "12px", background: "#f3f4f6", color: "#111827", fontWeight: 800, borderRadius: 12, border: "none", fontSize: 13 }}>📋 분석 결과 공유하기</button>
         </section>
       )}
