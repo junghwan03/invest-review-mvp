@@ -27,9 +27,9 @@ const EXPERTS = [
 ];
 
 const HISTORY_KEY = "analysis_history_v1";
-const USAGE_KEY = "daily_usage_v1"; // 횟수 제한 키
+const USAGE_KEY = "daily_usage_analysis_v1"; // 분석 전용 키
 const FREE_HISTORY_LIMIT = 10;
-const DAILY_LIMIT = 3; // 하루 제한 횟수
+const DAILY_LIMIT = 3; 
 
 function formatDateTime(ts: number) {
   const d = new Date(ts);
@@ -59,17 +59,15 @@ export default function UpgradePage() {
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
   const [selectedExpert, setSelectedExpert] = useState("warren_buffett");
   const [history, setHistory] = useState<any[]>([]);
-  const [usageCount, setUsageCount] = useState(0); // 사용 횟수 상태
+  const [usageCount, setUsageCount] = useState(0); 
   const matchingCardRef = useRef<HTMLDivElement>(null);
 
   const showAlert = (msg: string) => { setAlertMsg(msg); setIsAlertOpen(true); };
 
-  // 데이터 로드 및 날짜 체크
   useEffect(() => {
     const rawHistory = localStorage.getItem(HISTORY_KEY);
     if (rawHistory) setHistory(JSON.parse(rawHistory).slice(0, FREE_HISTORY_LIMIT));
 
-    // 일일 사용량 체크
     const today = new Date().toISOString().split('T')[0];
     const rawUsage = localStorage.getItem(USAGE_KEY);
     if (rawUsage) {
@@ -176,7 +174,6 @@ export default function UpgradePage() {
   };
 
   const handleSubmit = async () => {
-    // 횟수 제한 체크
     if (usageCount >= DAILY_LIMIT) {
       return showAlert(`오늘 무료 횟수(${DAILY_LIMIT}회)를 모두 소모했습니다.\n내일 다시 이용해주세요!`);
     }
@@ -190,18 +187,21 @@ export default function UpgradePage() {
       
       const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
+
+      // ✅ [수정] 서버가 알려준 '남은 횟수'로 브라우저 데이터 강제 동기화
+      if (data.remaining !== undefined) {
+        const actualUsageCount = DAILY_LIMIT - data.remaining;
+        setUsageCount(actualUsageCount);
+        localStorage.setItem(USAGE_KEY, JSON.stringify({ 
+          date: new Date().toISOString().split('T')[0], 
+          count: actualUsageCount 
+        }));
+      }
+
       const content = data.text || data.content || "";
       if (!content) throw new Error("데이터 없음");
       
       setResult(content);
-      
-      // 횟수 카운트 업데이트 및 저장
-      const nextCount = usageCount + 1;
-      setUsageCount(nextCount);
-      localStorage.setItem(USAGE_KEY, JSON.stringify({ 
-        date: new Date().toISOString().split('T')[0], 
-        count: nextCount 
-      }));
 
       let currentMatch = null;
       if (mode === "portfolio") {
@@ -303,7 +303,7 @@ export default function UpgradePage() {
         )}
       </section>
 
-      {/* ✅ 추가: 무료 사용 횟수 UI */}
+      {/* ✅ 무료 사용 횟수 UI */}
       <div style={{ marginBottom: 12, textAlign: "center" }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: usageCount >= DAILY_LIMIT ? "#ef4444" : "#4b5563" }}>
           오늘 무료 사용: {usageCount} / {DAILY_LIMIT} (남은 횟수: {Math.max(0, DAILY_LIMIT - usageCount)})
@@ -321,7 +321,6 @@ export default function UpgradePage() {
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
           <div style={{ fontSize: 20, fontWeight: 900 }}>{matchingResult.expertName} 일치도 {matchingResult.matchRate}%</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#ef4444", marginTop: 4 }}>현재 점수는 제대로 나오지 않습니다</div>
           <div style={{ fontSize: 48, margin: "12px 0" }}>{matchingResult.emoji}</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={async () => {

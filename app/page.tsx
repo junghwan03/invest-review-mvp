@@ -196,7 +196,7 @@ async function copyText(text: string) {
 }
 
 const DAILY_LIMIT = 3;
-const DAILY_LIMIT_KEY = "daily_ai_limit_v1";
+const DAILY_LIMIT_KEY = "daily_usage_review_v1"; // 복기 전용 키
 type DailyUsage = { date: string; count: number };
 
 function todayKeyLocal() {
