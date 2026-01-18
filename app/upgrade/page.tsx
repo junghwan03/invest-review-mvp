@@ -27,7 +27,7 @@ const EXPERTS = [
 ];
 
 const HISTORY_KEY = "analysis_history_v1";
-const USAGE_KEY = "daily_usage_analysis_v1"; // 분석 전용 키
+const USAGE_KEY = "daily_usage_analysis_v1"; 
 const FREE_HISTORY_LIMIT = 10;
 const DAILY_LIMIT = 3; 
 
@@ -174,8 +174,14 @@ export default function UpgradePage() {
   };
 
   const handleSubmit = async () => {
-    if (usageCount >= DAILY_LIMIT) {
-      return showAlert(`오늘 무료 횟수(${DAILY_LIMIT}회)를 모두 소모했습니다.\n내일 다시 이용해주세요!`);
+    const today = new Date().toISOString().split('T')[0];
+    const rawUsage = localStorage.getItem(USAGE_KEY);
+    let usageData = rawUsage ? JSON.parse(rawUsage) : { date: today, count: 0 };
+
+    if (usageData.date !== today) usageData = { date: today, count: 0 };
+
+    if (usageData.count >= DAILY_LIMIT) {
+      return showAlert(`오늘 심층 분석 무료 횟수(${DAILY_LIMIT}회)를 모두 소모했습니다.\n내일 다시 이용해주세요!`);
     }
 
     if (mode === "single" && !ticker.trim()) return showAlert("종목명을 입력해주세요.");
@@ -188,41 +194,33 @@ export default function UpgradePage() {
       const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
 
-      // ✅ [수정] 서버가 알려준 '남은 횟수'로 브라우저 데이터 강제 동기화
-      if (data.remaining !== undefined) {
-        const actualUsageCount = DAILY_LIMIT - data.remaining;
-        setUsageCount(actualUsageCount);
-        localStorage.setItem(USAGE_KEY, JSON.stringify({ 
-          date: new Date().toISOString().split('T')[0], 
-          count: actualUsageCount 
-        }));
-      }
+      if (!res.ok || !data.ok) throw new Error(data.text || "분석 실패");
+
+      const newCount = usageData.count + 1;
+      setUsageCount(newCount);
+      localStorage.setItem(USAGE_KEY, JSON.stringify({ date: today, count: newCount }));
 
       const content = data.text || data.content || "";
-      if (!content) throw new Error("데이터 없음");
-      
       setResult(content);
 
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
         const rate = (data.matchRate !== undefined && data.matchRate !== null) ? data.matchRate : 0;
-        currentMatch = { 
-          expertName: sel?.name, 
-          matchRate: rate, 
-          emoji: sel?.emoji 
-        };
+        currentMatch = { expertName: sel?.name, matchRate: rate, emoji: sel?.emoji };
         setMatchingResult(currentMatch);
       }
       saveToHistory({ id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`, result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch });
-    } catch { setResult("🚨 분석 중 오류가 발생했습니다."); } finally { setLoading(false); }
+    } catch (e: any) { 
+      setResult(`🚨 분석 오류: ${e.message}`); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "16px", boxSizing: "border-box" }}>
       <AlertModal isOpen={isAlertOpen} message={alertMsg} onClose={() => setIsAlertOpen(false)} />
-
-      {/* 헤더 버튼 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
         <button onClick={() => window.location.href = '/'} style={{ padding: "16px 12px", borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff", textAlign: "left" }}>
           <div style={{ fontSize: 20 }}>📝</div>
@@ -233,11 +231,8 @@ export default function UpgradePage() {
           <div style={{ fontWeight: 900, fontSize: 14, color: "#2563eb" }}>심층 분석</div>
         </button>
       </div>
-
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>AI 투자 심층 분석</h1>
       <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>지표 기반 정밀 진단 리포트</p>
-
-      {/* 이미지 업로드 */}
       <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center" }}>
         <label style={{ cursor: "pointer", display: "block" }}>
           {!previewUrl ? (
@@ -255,7 +250,6 @@ export default function UpgradePage() {
         </label>
         {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>}
       </section>
-
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["single", "portfolio"].map((m) => (
           <button key={m} onClick={() => setMode(m as any)} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: mode === m ? "#111827" : "#fff", color: mode === m ? "#fff" : "#111827", fontWeight: 800 }}>
@@ -263,7 +257,6 @@ export default function UpgradePage() {
           </button>
         ))}
       </div>
-
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", marginBottom: 20 }}>
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
@@ -302,21 +295,17 @@ export default function UpgradePage() {
           </div>
         )}
       </section>
-
-      {/* ✅ 무료 사용 횟수 UI */}
       <div style={{ marginBottom: 12, textAlign: "center" }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: usageCount >= DAILY_LIMIT ? "#ef4444" : "#4b5563" }}>
           오늘 무료 사용: {usageCount} / {DAILY_LIMIT} (남은 횟수: {Math.max(0, DAILY_LIMIT - usageCount)})
         </span>
       </div>
-
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         <button onClick={handleReset} style={{ flex: 1, padding: "16px", borderRadius: 16, background: "#f3f4f6", color: "#111827", fontWeight: 900, border: "none", fontSize: 16 }}>리셋</button>
         <button onClick={handleSubmit} disabled={loading || usageCount >= DAILY_LIMIT} style={{ flex: 2, padding: "16px", borderRadius: 16, background: (loading || usageCount >= DAILY_LIMIT) ? "#d1d5db" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16 }}>
           {loading ? "AI 분석 중..." : usageCount >= DAILY_LIMIT ? "사용 완료" : "분석 시작하기"}
         </button>
       </div>
-
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
@@ -331,7 +320,6 @@ export default function UpgradePage() {
           </div>
         </section>
       )}
-
       {result && (
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
           <div className="markdown-body" style={{ color: "#1f2937" }}>
@@ -349,7 +337,6 @@ export default function UpgradePage() {
           <button onClick={shareAnalysisResult} style={{ marginTop: 24, width: "100%", padding: "14px", background: "#f3f4f6", color: "#111827", fontWeight: 800, borderRadius: 12, border: "none", fontSize: 13 }}>📋 분석 결과 공유하기</button>
         </section>
       )}
-
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 분석 기록</h2>

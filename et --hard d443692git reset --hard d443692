@@ -1,0 +1,114 @@
+[33me79bd4a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix: final production code synchronization
+[33m6853824[m fix: restore vision prompt and stabilize api routes
+[33md4d22a3[m fix: stabilize server response and apiKey logic
+[33mfec3c83[m fix: change to edge runtime to prevent timeout
+[33mb86b685[m fix: final api response stabilization
+[33ma9fef81[m fix: unify api routes and restore all instructions
+[33mcedf6b3[m fix: restore all instructions and fix analysis routing
+[33m6b4c05f[m fix: analysis error and quota logic
+[33md0a614b[m fix: 분리된 로컬스토리지 횟수 제한 적용
+[33md28eab8[m deploy
+[33m519fd81[m deploy
+[33m1879704[m deploy
+[33m658a62a[m deploy
+[33m3b8a1ad[m feat: 심층 분석 3단 구조화 및 인식률 강화 적용
+[33md03befd[m deploy
+[33md443692[m feat: 통합 route 함수(Vision 포함) 및 3+3 제한 적용
+[33m1d6910e[m deploy
+[33m2cbf704[m deploy
+[33m25aa6ca[m deploy
+[33m9843b38[m deploy
+[33mcad6f4b[m deploy
+[33m462c117[m fix: disable export for vercel
+[33mb66d974[m deploy
+[33m5591799[m fix: remove export for vercel api
+[33m8e3261c[m deploy
+[33ma4e5907[m deploy
+[33md50a654[m deploy
+[33m0d762a5[m fix: overflow and ui sync
+[33mbca442e[m fix: overflow and ui sync
+[33m249cd55[m update
+[33m4af0bc7[m fix: match score unit to percentage and fix 0% bug
+[33mb4af9b2[m update
+[33mbea2845[m feat: stabilize analysis report format
+[33mb5a36ec[m update
+[33m03d75fd[m final: expert purge and gpt-4o enforcement
+[33m24f6e05[m final: expert purge and gpt-4o enforcement
+[33m6f00aec[m fix: total purge of expert comparison and force gpt-4o
+[33m08ffe6e[m fix: total system overhaul - gpt-4o upgraded for strict compliance
+[33md597d4a[m fix: precision routing for trade reflection and forced metaphors
+[33m43ae6c9[m fix: restore trade reflection and apply portfolio diagnosis
+[33ma1c480c[m feat: portfolio health diagnosis and fixed report metaphors
+[33m0a5e2d3[m fix: ROE/PSR metaphors and match rate sync
+[33m2dbccea[m fix: 리포트 가독성 개선 및 일치도 점수 수신 로직 수정
+[33mae73866[m feat: complete analysis template with ROE/PSR and fix layout
+[33m91ccf13[m fix: match rate logic and report formatting
+[33m7b58da3[m feat: apply strict analysis template and sector-based matching
+[33m7438881[m feat: implement sector-based scoring and strict report formatting
+[33m47aafa1[m feat: refine expert match logic and persona weights
+[33m3054025[m fix: implement real AI match rate and enhance price filter
+[33m989f4ea[m feat: refine analysis layout and fix expert match logic
+[33m29b954e[m feat: refine analysis layout and fix expert match logic
+[33m439ebf2[m feat: refine analysis layout and fix expert match logic
+[33mf72c663[m feat: refine analysis layout and fix expert match logic
+[33mc2f868f[m feat: refine analysis layout and fix expert match logic
+[33md169d33[m feat: refine analysis layout and fix expert match logic
+[33mc0fbb8a[m feat: refine analysis layout and absolute price block
+[33m3c767a1[m update: add educational analogies and ratio focus
+[33m98a7726[m fix: remove price dependency and focus on ratio analysis
+[33m0b6568f[m fix: resolve price accuracy and undefined error
+[33mf0df10e[m fix: resolve price accuracy and undefined error
+[33m2c4e180[m fix: absolute price accuracy and UI updates
+[33m4240665[m fix: enforce user price over AI internal data
+[33mbd2cbce[m fix: enforce absolute price accuracy and update backend logic
+[33m9c34485[m fix: enforce price accuracy and update backend logic
+[33md669c67[m fix: enforce price accuracy and remove daily limits
+[33m0567429[m deploy: support all us stocks and fix prompts
+[33m449b008[m fix: route type and config outdir
+[33m5af08c8[m fix: enforce user current price
+[33mefa43b7[m fix: ai integration and type errors
+[33mb87b561[m deploy
+[33m37c59ad[m fix: add share button and update offline storage guide
+[33ma0f6fc5[m feat: add local history to upgrade page
+[33m04b48b5[m fix: server routing and api sync
+[33meb382cb[m fix: retry deployment to resolve 405 error
+[33m2db661e[m fix: change PSR unit to times and finalize UI
+[33mf8aaede[m fix: resolve 405 error and sync ui
+[33me2fece4[m fix: ui sync and add units
+[33m0b5dc0d[m fix: overflow and ui sync
+[33mb4e0512[m Fix: layout overflow, consistency and units
+[33m3092457[m Fix: layout consistency and grid overflow
+[33mfaed10a[m Fix: Mobile 2x3 grid layout and overflow
+[33m7d5f78c[m Fix: Mobile 2/2/2 layout and overflow issues
+[33m33bf084[m Update: Mobile 2x3 grid and layout optimization
+[33m56bae26[m Fix: Mobile UI 2x3 grid and vision logic
+[33m8576548[m Fix: backend CORS and vision logic
+[33md8172e3[m Fix: backend CORS and vision logic
+[33m05ff83c[m Fix: Enable API routes for Vercel deployment
+[33m4d9a1e3[m fix: toss app name and icon config
+[33mc1b971b[m fix: toss app name and icon config
+[33m03f34fa[m fix: toss app name and icon config
+[33m42a198c[m Update App Title for Toss Review
+[33m46da2e1[m Add Share button and fix UI
+[33m3769d73[m UI fix: Modal update and Checkbox style
+[33m2b2cf59[m Fix Vercel API access denied
+[33mfb4dcb0[m Fix duplicate entryPrice in fetch body
+[33m8910e88[m Fix API url and CORS for Toss app
+[33m0aaf317[m fix: ai api stable + ready for deploy
+[33m192ae98[m fix: enable api route on vercel
+[33m22d2582[m chore: vercel redeploy
+[33mfada2da[m fix: use API_BASE for ai endpoint
+[33m99df577[m Increase daily free limit to 3
+[33mec01c4d[m Update beta notice and app copy
+[33m3632d99[m Update onboarding copy and tabs
+[33mc93ced2[m feat: rule-check required + ETF flow polish
+[33mf4068aa[m Add daily free limit (2/day) + GA events
+[33m84f8fc2[m Add daily free limit (2/day) + GA events
+[33m5afea33[m update
+[33m4ff32cf[m Add daily free limit (2/day) + GA events
+[33m92b2111[m feat: add GA events
+[33m7e73634[m fix: daily limit + duplicate generate bug
+[33m1fb8e65[m feat: add GA events
+[33m022abcc[m feat: add Google Analytics
+[33md30f304[m update: offline save, stop loss, examples UI
+[33m7d03fb7[m invest review MVP

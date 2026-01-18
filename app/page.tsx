@@ -492,11 +492,16 @@ export default function Page() {
   function clearChecklistChecks() { markRulesCheckedOnce(); setChecklist((prev) => prev.map((c) => ({ ...c, checked: false }))); }
   function buildReasonForAI() { const base = (reasonNote ?? "").trim(); const ck = buildChecklistSummary(checklist); return (base ? base : "(메모 없음)") + ck; }
 
+  // =========================================================
+  // 🚀 [중요] AI 생성 로직 (로컬스토리지 횟수 제한 적용)
+  // =========================================================
   async function onGenerate() {
     if (assetType !== "stock") { showAlert("현재는 주식 탭만 지원합니다."); return; }
     if (!ticker.trim()) { showAlert("종목/티커를 입력해 주세요."); return; }
     if (!Number.isFinite(entryPrice) || entryPrice <= 0) { showAlert("진입가(필수)를 올바르게 입력해 주세요."); return; }
     if (!rulesCheckedOnce[tradeType]) { setRulesOpen(true); showAlert("AI 생성 전에 ‘규칙 체크(점검)’을 최소 1회 진행해 주세요."); return; }
+    
+    // 1️⃣ 로컬스토리지 횟수 체크 (서버 통신 전)
     const usage = readDailyUsage();
     if (usage.count >= DAILY_LIMIT) { showAlert("무료 버전은 하루에 3회까지만 AI 복기 리포트를 생성할 수 있습니다."); return; }
 
@@ -505,27 +510,34 @@ export default function Page() {
     setResult("AI가 리포트를 작성 중입니다...");
 
     try {
-      // ✅ [수정] 통합된 백엔드 경로로 변경하고 슬래시 중복 방지
-      const API_URL = getApiUrl("/api/ai/upgrade");
-      const res = await fetch(API_URL, {
+      // ✅ 통합된 백엔드 상대 경로 사용
+      const res = await fetch("/api/ai/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ticker, entryPrice, stopLoss: stopLoss === "" ? null : stopLoss, reasonNote: buildReasonForAI(), tradeType }),
       });
+      
       const { raw, data } = await safeReadResponse(res);
-      if (!res.ok) {
-        const msg = (data && data.text) ? data.text : (raw ? raw.slice(0, 400) : "서버 응답이 비어 있습니다.");
-        setResult(`서버 에러 (${res.status}): ${msg}`);
+      if (!res.ok || !data?.ok) {
+        const msg = (data && data.text) ? data.text : (raw ? raw.slice(0, 400) : "서버 응답 오류");
+        setResult(`분석 실패: ${msg}`);
         return;
       }
-      writeDailyUsage({ date: usage.date, count: usage.count + 1 });
-      setDailyCount(usage.count + 1);
-      const text = data?.text ?? "응답에 text가 없습니다.";
+
+      // 2️⃣ 성공 시 로컬스토리지 카운트 즉시 증가
+      const nextUsage = { date: usage.date, count: usage.count + 1 };
+      writeDailyUsage(nextUsage);
+      setDailyCount(nextUsage.count);
+
+      const text = data?.text ?? "응답에 데이터가 없습니다.";
       setResult(text);
       saveToHistory({ tradeType, ticker, entryPrice, stopLoss: stopLoss === "" ? null : stopLoss, reasonNote, result: text, checklist });
       setCheckOpen(false);
-    } catch (err: any) { setResult(`네트워크/실행 오류: ${String(err?.message ?? err)}`); }
-    finally { setLoading(false); }
+    } catch (err: any) { 
+      setResult(`네트워크/실행 오류: ${String(err?.message ?? err)}`); 
+    } finally { 
+      setLoading(false); 
+    }
   }
 
   function onClearAll() {

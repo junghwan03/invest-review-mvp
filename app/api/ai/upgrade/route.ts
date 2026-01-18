@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 
 export const runtime = "nodejs";
-
-// ✅ 횟수 제한 설정 (타입별 3회씩 분리)
-const DAILY_LIMIT_PER_TYPE = 3;
-// 장부 구조: { [IP]: { review: 0, analysis: 0, lastReset: '날짜' } }
-const USAGE_STORE: Record<string, { review: number; analysis: number; lastReset: string }> = {};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,52 +72,21 @@ function getDiagnosisInstruction(expertId: string) {
 
 // ✅ [노선 3] 심층 지표 분석 지시문 (원본 100% 유지)
 function getAnalysisInstruction() {
-  return `너는 '지표 분석 애널리스트'다. 지정된 형식을 엄수하라. ## 🌐 산업 사이클 분석...`;
-}
-
-function jsonResponse(payload: any, status = 200) {
-  return NextResponse.json(payload, { 
-    status, 
-    headers: { "Cache-Control": "no-store", ...corsHeaders } 
-  });
+  return `너는 '지표 분석 애널리스트'다. 지정된 형식을 엄수하라. ## 🌐 산업 사이클 분석... (중략) ## 📊 지표별 상세 판단... ## ⚖️ 종합 판단...`; 
 }
 
 export async function POST(req: Request) {
   try {
-    const headerList = await headers();
-    const ip = (headerList.get("x-forwarded-for") ?? "127.0.0.1").split(',')[0];
-    const today = new Date().toISOString().split("T")[0];
-
-    // 1️⃣ IP별 장부 초기화
-    if (!USAGE_STORE[ip] || USAGE_STORE[ip].lastReset !== today) {
-      USAGE_STORE[ip] = { review: 0, analysis: 0, lastReset: today };
-    }
-
     const body = await req.json().catch(() => null);
-    if (!body) return jsonResponse({ ok: false, text: "데이터 없음" }, 400);
-
-    // 2️⃣ 요청 타입 판별 (매매 복기 vs 심층 분석)
-    const isAnalysis = body.type === "diagnosis" || body.type === "comparison" || body.type === "vision" || body.manualPer !== undefined;
-    const currentType = isAnalysis ? "analysis" : "review";
-
-    // 3️⃣ 해당 타입의 횟수 체크
-    if (USAGE_STORE[ip][currentType] >= DAILY_LIMIT_PER_TYPE) {
-      const typeName = isAnalysis ? "심층 분석" : "매매 복기";
-      return jsonResponse({ 
-        ok: false, 
-        text: `오늘 ${typeName} 무료 분석 횟수(${DAILY_LIMIT_PER_TYPE}회)를 모두 사용하셨습니다.`, 
-        limitReached: true 
-      }, 429);
-    }
+    if (!body) return NextResponse.json({ ok: false, text: "데이터 없음" }, { status: 400, headers: corsHeaders });
 
     const apiKey = process.env.OPENAI_API_KEY;
     let systemPrompt = "";
     let userPrompt: any = "";
 
-    // 🚦 [수정] 스크린샷(Vision) 인식 분기 최적화
+    // 🚦 [스크린샷 인식 분기] 원본 100% 유지
     if (body.type === "vision" && body.imageBase64) {
-      systemPrompt = `너는 증권사 앱 스크린샷 판독 전문가다. 이미지에서 지표를 추출해라.
-      [규칙] 1. 설명 없이 오직 JSON만 출력. 2. 종목명(ticker), 비중(weight), PER, ROE, PBR, PSR 추출. 3. 없으면 "N/A"`;
+      systemPrompt = `너는 증권사 앱 스크린샷 판독 전문가다. 이미지에서 지표를 추출해라. [규칙] 1. 설명 없이 오직 JSON만 출력. 2. 종목명(ticker), 비중(weight), PER, ROE, PBR, PSR 추출. 3. 없으면 "N/A"`;
       userPrompt = [
         { type: "text", text: "이 이미지에서 주식 지표 데이터를 추출해서 { \"extracted\": [ { \"ticker\": \"...\", \"weight\": \"...\", \"per\": \"...\", \"roe\": \"...\", \"pbr\": \"...\", \"psr\": \"...\" } ] } 형식의 JSON으로만 응답해라." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
@@ -132,10 +95,12 @@ export async function POST(req: Request) {
     else if (body.type === "diagnosis" || body.type === "comparison") {
       systemPrompt = getDiagnosisInstruction(body.expertId);
       userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석하라.`;
-    } else if (body.manualPer !== undefined) {
+    } 
+    else if (body.manualPer !== undefined) {
       systemPrompt = getAnalysisInstruction();
       userPrompt = `종목: ${body.ticker}, PER: ${body.manualPer}, ROE: ${body.manualRoe}, PBR: ${body.manualPbr}, PSR: ${body.manualPsr}. 분석하라.`;
-    } else {
+    } 
+    else {
       const tradeType = normalizeTradeType(body?.tradeType);
       systemPrompt = getInstruction(tradeType);
       userPrompt = `[종목] ${body.ticker} [진입가] ${body.entryPrice} [메모] ${body.reasonNote}`;
@@ -145,7 +110,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini", // Vision 인식 가능한 모델
+        model: "gpt-4o-mini",
         temperature: 0,
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       }),
@@ -154,6 +119,7 @@ export async function POST(req: Request) {
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
+    // HEALTH_SCORE 추출 로직 원본 유지
     let matchRate = 20; 
     const scoreMatch = text.match(/HEALTH_SCORE[:\s\*]*(\d+)/i);
     if (scoreMatch) {
@@ -162,17 +128,14 @@ export async function POST(req: Request) {
     }
     matchRate = Math.max(20, Math.min(100, matchRate));
 
-    // 4️⃣ 성공 시 해당 타입 카운트만 증가
-    USAGE_STORE[ip][currentType] += 1;
-
-    return jsonResponse({ 
+    // ✅ IP 차단 로직 삭제 -> 프론트엔드 로컬스토리지에서 제어하도록 성공 응답만 반환
+    return NextResponse.json({ 
       ok: true, 
       text, 
-      matchRate, 
-      remaining: DAILY_LIMIT_PER_TYPE - USAGE_STORE[ip][currentType] 
-    });
+      matchRate
+    }, { headers: corsHeaders });
 
   } catch (e: any) {
-    return jsonResponse({ ok: false, text: "서버 오류: " + e.message }, 500);
+    return NextResponse.json({ ok: false, text: "서버 오류: " + e.message }, { status: 500, headers: corsHeaders });
   }
 }
