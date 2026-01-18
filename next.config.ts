@@ -1,9 +1,9 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  //output: "export", // 주석 해제하여 정적 빌드 활성화 (토스 업로드용)
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  //output: "export",
+  distDir: ".next/web", // 토스가 요구하는 경로로 변경
   images: {
-    unoptimized: true, // 정적 배포 시 이미지 최적화 기능 비활성화 필수
+    unoptimized: true,
   },
 };
 
