@@ -52,7 +52,7 @@ export default function UpgradePage() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [matchingResult, setMatchingResult] = useState<any>(null);
   const [ticker, setTicker] = useState("");
-  const [currentPrice, setCurrentPrice] = useState("");
+  // ✅ currentPrice 상태 제거
   const [manualData, setManualData] = useState({ per: "", roe: "", pbr: "", psr: "" });
   const [portfolio, setPortfolio] = useState<{ ticker: string; weight: number }[]>([]);
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
@@ -76,7 +76,6 @@ export default function UpgradePage() {
   const loadHistoryItem = (h: any) => {
     setMode(h.mode); 
     setTicker(h.ticker || ""); 
-    setCurrentPrice(h.currentPrice || ""); 
     setResult(h.result); 
     setMatchingResult(h.matchingResult || null);
     if (h.manualData) setManualData(h.manualData);
@@ -110,7 +109,7 @@ export default function UpgradePage() {
             setMode("portfolio"); setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
           } else {
             setMode("single"); setTicker(item.ticker.toUpperCase());
-            if (item.price) setCurrentPrice(String(item.price));
+            // ✅ 가격 자동입력 로직 제거
             setManualData({ per: item.per || "", roe: item.roe || "", pbr: item.pbr || "", psr: item.psr || "" });
           }
         }
@@ -119,24 +118,45 @@ export default function UpgradePage() {
   };
 
   const handleSubmit = async () => {
-    if (mode === "single" && (!ticker.trim() || !currentPrice.trim())) return showAlert("종목명과 현재가를 입력해주세요.");
+    // ✅ 가격 체크 로직 제거
+    if (mode === "single" && !ticker.trim()) return showAlert("종목명을 입력해주세요.");
+    
     setLoading(true); setResult(""); setMatchingResult(null);
     try {
       const payload = mode === "single" 
-        ? { ticker: ticker.trim().toUpperCase(), currentPrice: currentPrice.trim(), manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } 
+        ? { 
+            ticker: ticker.trim().toUpperCase(), 
+            // ✅ 페이로드에서 currentPrice 제거
+            manualPer: manualData.per, 
+            manualRoe: manualData.roe, 
+            manualPbr: manualData.pbr, 
+            manualPsr: manualData.psr 
+          } 
         : { type: "comparison", portfolio, expertId: selectedExpert };
+      
       const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       const content = data.text || data.content || (typeof data === 'string' ? data : "");
       if (!content) throw new Error("데이터 없음");
       setResult(content);
+      
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
         currentMatch = { expertName: sel?.name, matchRate: Math.floor(Math.random() * 15) + 82, emoji: sel?.emoji };
         setMatchingResult(currentMatch);
       }
-      saveToHistory({ id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`, currentPrice: mode === "single" ? currentPrice : null, result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch });
+      
+      saveToHistory({ 
+        id: Date.now(), 
+        createdAt: Date.now(), 
+        mode, 
+        ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`, 
+        result: content, 
+        manualData: mode === "single" ? manualData : null, 
+        portfolio: mode === "portfolio" ? portfolio : null, 
+        matchingResult: currentMatch 
+      });
     } catch { setResult("🚨 오류 발생"); } finally { setLoading(false); }
   };
 
@@ -157,7 +177,7 @@ export default function UpgradePage() {
       </div>
 
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>AI 투자 심층 분석</h1>
-      <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>종목/포트폴리오 정밀 진단 리포트</p>
+      <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>지표 기반 정밀 진단 리포트</p>
 
       {/* 스크린샷 업로드 영역 */}
       <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center" }}>
@@ -176,8 +196,6 @@ export default function UpgradePage() {
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} />
         </label>
         {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>}
-        
-        {/* ✅ 고수 비교 미지원 안내 (빨간색) */}
         <p style={{ marginTop: 12, fontSize: 11, color: "#ef4444", fontWeight: 700 }}>
           * 고수 비교(포트폴리오)는 아직 스크린샷 인식을 지원하지 않습니다.
         </p>
@@ -187,7 +205,7 @@ export default function UpgradePage() {
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["single", "portfolio"].map((m) => (
           <button key={m} onClick={() => setMode(m as any)} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: mode === m ? "#111827" : "#fff", color: mode === m ? "#fff" : "#111827", fontWeight: 800 }}>
-            {m === "single" ? "🔍 종목 분석" : "🏆 고수 비교"}
+            {m === "single" ? "🔍 지표 분석" : "🏆 고수 비교"}
           </button>
         ))}
       </div>
@@ -197,7 +215,8 @@ export default function UpgradePage() {
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
             <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="종목명 (예: TSLA)" style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #e5e7eb", fontWeight: 700, boxSizing: "border-box" }} />
-            <input value={currentPrice} onChange={(e) => setCurrentPrice(e.target.value)} placeholder="현재가 (예: 225)" style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #e5e7eb", fontWeight: 700, boxSizing: "border-box" }} />
+            
+            {/* ✅ 현재가 입력란 제거됨 */}
             
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {["per", "roe", "pbr", "psr"].map((k) => (
@@ -209,7 +228,6 @@ export default function UpgradePage() {
                     value={(manualData as any)[k]}
                     onChange={e => setManualData({...manualData, [k]: e.target.value})}
                   />
-                  {/* ✅ 단위 (배, %) 추가 */}
                   <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#9ca3af", fontWeight: 700 }}>
                     {(k === "per" || k === "pbr" || k === "psr") ? "배" : "%"}
                   </span>
