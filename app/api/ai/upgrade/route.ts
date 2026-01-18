@@ -94,10 +94,21 @@ export async function POST(req: Request) {
     let systemPrompt = "";
     let userPrompt: any = "";
 
+    // 🚦 [비전 인식 강화] 지표 매칭 가이드 추가
     if (body.type === "vision" && body.imageBase64) {
-      systemPrompt = `너는 증권사 앱 스크린샷 판독 전문가다. 이미지에서 지표를 추출해라. [규칙] 1. 설명 없이 오직 JSON만 출력. 2. 종목명(ticker), 비중(weight), PER, ROE, PBR, PSR 추출. 3. 없으면 "N/A"`;
+      systemPrompt = `너는 증권사 MTS/HTS 앱 스크린샷 판독 전문가다. 이미지에서 주식 지표를 정밀하게 추출하라.
+      [추출 가이드]
+      1. PER: 주가수익비율, P/E, PER(배) 등의 항목을 찾아라.
+      2. PBR: 주가순자산비율, P/B, PBR(배) 등의 항목을 찾아라.
+      3. ROE: 자기자본이익률, ROE(%) 등의 항목을 찾아라.
+      4. PSR: 주가매출비율, P/S, PSR(배) 등의 항목을 찾아라.
+      5. ticker: 종목명 또는 티커명을 추출하라.
+      6. weight: 포트폴리오 비중(%)이 있다면 추출하라.
+      
+      [규칙] 1. 설명 없이 오직 JSON만 출력. 2. 숫자에 포함된 단위(배, %, 원)는 제외하고 숫자만 추출. 3. 데이터가 모호하면 "N/A" 처리.`;
+      
       userPrompt = [
-        { type: "text", text: "이 이미지에서 주식 지표 데이터를 추출해서 JSON으로만 응답해라." },
+        { type: "text", text: "이 이미지에서 주식 지표 데이터를 추출해서 { \"extracted\": [ { \"ticker\": \"...\", \"weight\": \"...\", \"per\": \"...\", \"roe\": \"...\", \"pbr\": \"...\", \"psr\": \"...\" } ] } 형식의 JSON으로만 응답해라." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
       ];
     } 

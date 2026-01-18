@@ -157,6 +157,10 @@ export default function UpgradePage() {
           body: JSON.stringify({ type: "vision", imageBase64: base64Full.split(",")[1] }),
         });
         const data = await res.json();
+        
+        // ✅ [수정] 응답 결과 확인 로직 강화
+        if (!res.ok || !data.ok) throw new Error("인식 실패");
+
         const contentStr = data.text || data.content || "";
         const parsed = JSON.parse(contentStr.replace(/```json|```/g, ""));
         const item = parsed.extracted?.[0];
@@ -168,8 +172,16 @@ export default function UpgradePage() {
             setMode("single"); setTicker(item.ticker.toUpperCase());
             setManualData({ per: item.per || "", roe: item.roe || "", pbr: item.pbr || "", psr: item.psr || "" });
           }
+        } else {
+          throw new Error("데이터 없음");
         }
-      } catch { setUploadStatus("❌ 분석 실패"); } finally { setVisionLoading(false); }
+      } catch (err) { 
+        // 🚨 [수정] 에러 발생 시 즉시 로딩 해제 및 상태 변경
+        setUploadStatus("❌ 분석 실패 (인식할 수 없는 이미지)");
+        showAlert("이미지에서 지표를 읽지 못했습니다. 직접 입력하거나 다른 사진을 써주세요.");
+      } finally { 
+        setVisionLoading(false); 
+      }
     };
   };
 
@@ -181,7 +193,7 @@ export default function UpgradePage() {
     if (usageData.date !== today) usageData = { date: today, count: 0 };
 
     if (usageData.count >= DAILY_LIMIT) {
-      return showAlert(`오늘 심층 분석 무료 횟수(${DAILY_LIMIT}회)를 모두 소모했습니다.\n내일 다시 이용해주세요!`);
+      return showAlert(`오늘 무료 횟수(${DAILY_LIMIT}회)를 모두 소모했습니다.\n내일 다시 이용해주세요!`);
     }
 
     if (mode === "single" && !ticker.trim()) return showAlert("종목명을 입력해주세요.");
@@ -221,6 +233,7 @@ export default function UpgradePage() {
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "16px", boxSizing: "border-box" }}>
       <AlertModal isOpen={isAlertOpen} message={alertMsg} onClose={() => setIsAlertOpen(false)} />
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
         <button onClick={() => window.location.href = '/'} style={{ padding: "16px 12px", borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff", textAlign: "left" }}>
           <div style={{ fontSize: 20 }}>📝</div>
@@ -231,14 +244,16 @@ export default function UpgradePage() {
           <div style={{ fontWeight: 900, fontSize: 14, color: "#2563eb" }}>심층 분석</div>
         </button>
       </div>
+
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>AI 투자 심층 분석</h1>
       <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>지표 기반 정밀 진단 리포트</p>
+
       <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center" }}>
         <label style={{ cursor: "pointer", display: "block" }}>
           {!previewUrl ? (
             <div style={{ padding: "20px 0" }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>📸</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#ef4444" }}>현재 고수 비교는 스크린샷은 지원하지 않습니다</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#2563eb" }}>화면을 캡쳐해서 올려보세요 (자동 입력)</div>
             </div>
           ) : (
             <div style={{ position: "relative", width: "fit-content", margin: "0 auto" }}>
@@ -248,8 +263,9 @@ export default function UpgradePage() {
           )}
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} />
         </label>
-        {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>}
+        {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#ef4444" }}>{uploadStatus}</div>}
       </section>
+
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["single", "portfolio"].map((m) => (
           <button key={m} onClick={() => setMode(m as any)} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: mode === m ? "#111827" : "#fff", color: mode === m ? "#fff" : "#111827", fontWeight: 800 }}>
@@ -257,6 +273,7 @@ export default function UpgradePage() {
           </button>
         ))}
       </div>
+
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", marginBottom: 20 }}>
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
@@ -295,17 +312,20 @@ export default function UpgradePage() {
           </div>
         )}
       </section>
+
       <div style={{ marginBottom: 12, textAlign: "center" }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: usageCount >= DAILY_LIMIT ? "#ef4444" : "#4b5563" }}>
           오늘 무료 사용: {usageCount} / {DAILY_LIMIT} (남은 횟수: {Math.max(0, DAILY_LIMIT - usageCount)})
         </span>
       </div>
+
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         <button onClick={handleReset} style={{ flex: 1, padding: "16px", borderRadius: 16, background: "#f3f4f6", color: "#111827", fontWeight: 900, border: "none", fontSize: 16 }}>리셋</button>
         <button onClick={handleSubmit} disabled={loading || usageCount >= DAILY_LIMIT} style={{ flex: 2, padding: "16px", borderRadius: 16, background: (loading || usageCount >= DAILY_LIMIT) ? "#d1d5db" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16 }}>
           {loading ? "AI 분석 중..." : usageCount >= DAILY_LIMIT ? "사용 완료" : "분석 시작하기"}
         </button>
       </div>
+
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
@@ -320,6 +340,7 @@ export default function UpgradePage() {
           </div>
         </section>
       )}
+
       {result && (
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
           <div className="markdown-body" style={{ color: "#1f2937" }}>
@@ -337,6 +358,7 @@ export default function UpgradePage() {
           <button onClick={shareAnalysisResult} style={{ marginTop: 24, width: "100%", padding: "14px", background: "#f3f4f6", color: "#111827", fontWeight: 800, borderRadius: 12, border: "none", fontSize: 13 }}>📋 분석 결과 공유하기</button>
         </section>
       )}
+
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 분석 기록</h2>
