@@ -66,7 +66,6 @@ export default function UpgradePage() {
     if (rawHistory) setHistory(JSON.parse(rawHistory).slice(0, FREE_HISTORY_LIMIT));
   }, []);
 
-  // 🔄 입력 리셋 기능 추가
   const handleReset = () => {
     setTicker("");
     setManualData({ per: "", roe: "", pbr: "", psr: "" });
@@ -212,8 +211,8 @@ export default function UpgradePage() {
           {!previewUrl ? (
             <div style={{ padding: "20px 0" }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>📸</div>
-              {/* ✅ [수정] 안내 문구 변경 */}
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#2563eb" }}>현재 고수비교는 지원하지 않습니다</div>
+              {/* ✅ [수정] 안내 문구 변경 및 빨간색 적용 */}
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#ef4444" }}>현재 고수 비교는 스크린샷은 지원하지 않습니다</div>
             </div>
           ) : (
             <div style={{ position: "relative", width: "fit-content", margin: "0 auto" }}>
@@ -273,9 +272,9 @@ export default function UpgradePage() {
         )}
       </section>
 
-      {/* ✅ [수정] 리셋 버튼과 분석 버튼을 감싸는 컨테이너 추가 */}
+      {/* ✅ [수정] 버튼 텍스트를 '리셋'으로 변경 */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-        <button onClick={handleReset} style={{ flex: 1, padding: "16px", borderRadius: 16, background: "#f3f4f6", color: "#111827", fontWeight: 900, border: "none", fontSize: 16 }}>초기화</button>
+        <button onClick={handleReset} style={{ flex: 1, padding: "16px", borderRadius: 16, background: "#f3f4f6", color: "#111827", fontWeight: 900, border: "none", fontSize: 16 }}>리셋</button>
         <button onClick={handleSubmit} disabled={loading} style={{ flex: 2, padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16 }}>
           {loading ? "AI 분석 중..." : "분석 시작하기"}
         </button>
@@ -285,7 +284,7 @@ export default function UpgradePage() {
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
           <div style={{ fontSize: 20, fontWeight: 900 }}>{matchingResult.expertName} 일치도 {matchingResult.matchRate}%</div>
-          {/* ✅ [수정] 점수 하단 빨간색 경고 문구 추가 */}
+          {/* ✅ [수정] 점수 하단 빨간색 경고 문구 적용 */}
           <div style={{ fontSize: 12, fontWeight: 700, color: "#ef4444", marginTop: 4 }}>현재 점수는 제대로 나오지 않습니다</div>
           
           <div style={{ fontSize: 48, margin: "12px 0" }}>{matchingResult.emoji}</div>

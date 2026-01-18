@@ -9,6 +9,7 @@ function normalizeTradeType(v: any): TradeType {
   return "long";
 }
 
+// ✅ [기존 로직] 매매 복기용 지시문 (수정 없이 그대로 유지)
 function getInstruction(tradeType: TradeType) {
   const commonRules = `
 너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
@@ -117,6 +118,25 @@ ${commonRules}
   return etfGuide;
 }
 
+// ✅ [새로 추가] 심층 분석용 지시문 (형식 고정)
+function getAnalysisInstruction() {
+  return `
+너는 "AI 주식 지표 분석가"다. 출력은 반드시 한국어.
+사용자가 제공한 PER, ROE, PBR, PSR 지표를 바탕으로 심층 리포트를 작성하라.
+절대 '매수', '매도', '추가 매수' 같은 투자 행동 제안을 하지 마라.
+오직 시장의 객관적 상태와 데이터 분석 결과만 제공한다.
+
+[출력 형식 고정]
+- 제목: [티커] AI 지표 심층 리포트
+- 1) 산업 사이클 진단 (성장/성숙/쇠퇴기 중 분석)
+- 2) PER 분석 (붕어빵 기계 비유를 사용하여 현재 배수의 의미 설명)
+- 3) PBR 분석 (내 집 마련 비유를 사용하여 자산 가치 설명)
+- 4) ROE 분석 (커피숍 이익률 비유를 사용하여 효율성 설명)
+- 5) PSR 분석 (시장 가판대 매출 비유를 사용하여 성장성 설명)
+- 6) 종합 결론 (위 지표들을 종합한 객관적 요약 3줄)
+`.trim();
+}
+
 function jsonResponse(payload: any, status = 200) {
   return NextResponse.json(payload, {
     status,
@@ -152,9 +172,7 @@ async function safeReadJson(req: Request) {
 async function parseOpenAIResponse(res: Response) {
   const contentType = res.headers.get("content-type") || "";
   const raw = await res.text();
-
   if (!raw || !raw.trim()) return { raw: "", data: null as any };
-
   if (contentType.includes("application/json")) {
     try {
       return { raw, data: JSON.parse(raw) };
@@ -162,38 +180,45 @@ async function parseOpenAIResponse(res: Response) {
       return { raw, data: null as any };
     }
   }
-
   return { raw, data: null as any };
 }
 
 export async function POST(req: Request) {
   try {
     const body = await safeReadJson(req);
-
-    const tickerRaw = body?.ticker ?? "";
-    const entryPrice = body?.entryPrice ?? "";
-    const stopLoss = body?.stopLoss ?? null;
-    const reasonNote = body?.reasonNote ?? "";
-    const tradeType = normalizeTradeType(body?.tradeType);
+    if (!body) return jsonResponse({ ok: false, text: "요청 데이터가 없습니다." }, 400);
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return jsonResponse(
-        { ok: false, text: "OPENAI_API_KEY가 없습니다. (Vercel Environment Variables 확인)" },
-        500
-      );
-    }
+    if (!apiKey) return jsonResponse({ ok: false, text: "OPENAI_API_KEY가 없습니다." }, 500);
 
-    const instruction = getInstruction(tradeType);
+    let systemInstruction = "";
+    let userContext = "";
 
-    const userContext = `
-[매매유형] ${tradeType}
-[종목] ${String(tickerRaw).toUpperCase()}
-[진입가] ${entryPrice}
-[손절가] ${stopLoss === null || stopLoss === "" ? "N/A" : stopLoss}
-[메모]
-${reasonNote}
+    // 💡 [분기] 심층 분석 요청인지 매매 복기 요청인지 확인
+    if (body.manualPer !== undefined) {
+      // 심층 분석 모드
+      systemInstruction = getAnalysisInstruction();
+      userContext = `
+[종목] ${String(body.ticker || "N/A").toUpperCase()}
+[지표 정보]
+- PER: ${body.manualPer}배
+- ROE: ${body.manualRoe}%
+- PBR: ${body.manualPbr}배
+- PSR: ${body.manualPsr}배
 `.trim();
+    } else {
+      // 매매 복기 모드 (기존 로직)
+      const tradeType = normalizeTradeType(body?.tradeType);
+      systemInstruction = getInstruction(tradeType);
+      userContext = `
+[매매유형] ${tradeType}
+[종목] ${String(body.ticker || "").toUpperCase()}
+[진입가] ${body.entryPrice || ""}
+[손절가] ${body.stopLoss || "N/A"}
+[메모]
+${body.reasonNote || ""}
+`.trim();
+    }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -203,35 +228,23 @@ ${reasonNote}
       },
       cache: "no-store",
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        temperature: 0.35,
+        model: "gpt-4o-mini", // 💡 안정적인 최신 모델로 수정
+        temperature: 0.3,
         messages: [
-          { role: "system", content: instruction.trim() },
+          { role: "system", content: systemInstruction },
           { role: "user", content: userContext },
         ],
       }),
     });
 
     const { raw, data } = await parseOpenAIResponse(res);
-
     if (!res.ok) {
-      const msg =
-        data?.error?.message ||
-        (raw ? raw.slice(0, 400) : "OpenAI 응답이 비어 있습니다.");
-      return jsonResponse({ ok: false, text: `OpenAI 에러 (${res.status}): ${msg}` }, 500);
+      const msg = data?.error?.message || (raw ? raw.slice(0, 400) : "OpenAI 응답 오류");
+      return jsonResponse({ ok: false, text: `OpenAI 에러: ${msg}` }, 500);
     }
 
     const text = data?.choices?.[0]?.message?.content;
-    if (!text || typeof text !== "string") {
-      return jsonResponse(
-        {
-          ok: false,
-          text: "OpenAI 응답 파싱 실패(choices/message/content 없음)",
-          debug: raw?.slice(0, 400),
-        },
-        500
-      );
-    }
+    if (!text) return jsonResponse({ ok: false, text: "응답을 생성하지 못했습니다." }, 500);
 
     return jsonResponse({ ok: true, text }, 200);
   } catch (e: any) {
