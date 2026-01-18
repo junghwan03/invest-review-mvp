@@ -9,21 +9,19 @@ function normalizeTradeType(v: any): TradeType {
   return "long";
 }
 
-// =========================================================
-// 📝 [기록 보존] 매매 복기용 가이드라인
-// =========================================================
+// ✅ [기능 유지] 매매 복기용 가이드라인 (절대 삭제/생략 금지)
 function getInstruction(tradeType: TradeType) {
   const commonRules = `
 너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
 장황하지 않게, "기준/행동/숫자" 중심으로 쓴다.
 [점수 표기 규칙] 반드시 "N/10점" 형태만 사용.
-[출력 형식] 제목 / 한줄 총평 / 점수와 근거 / 감정 경고 / 매매 유형 / 개선 액션 / 체크리스트
+[출력 형식 고정] 제목 / 한줄 총평 / 점수와 근거 / 감정 경고 / 매매 유형 / 개선 액션 / 체크리스트
 `;
 
-  const longGuide = `[역할] 장기/가치투자 코치. 펀더멘털 중심. ${commonRules}`;
-  const swingGuide = `[역할] 스윙 트레이딩 코치. 진입/손절 숫자 기준 중심. ${commonRules}`;
-  const dayGuide = `[역할] 단타 코치. 실행 규칙과 손절 속도 중심. ${commonRules}`;
-  const etfGuide = `[역할] ETF 코치. 지수 구조와 비용/분배금 중심. ${commonRules}`;
+  const longGuide = `너는 장기/가치투자 코치다. 펀더멘털/해자/밸류에이션을 중점적으로 봐라. ${commonRules}`;
+  const swingGuide = `너는 스윙 트레이딩 코치다. 진입/손절/익절의 숫자 기준을 최우선으로 본다. ${commonRules}`;
+  const dayGuide = `너는 단타 복기 코치다. 실행 규칙과 손절 속도, 멘탈 관리를 최우선으로 본다. ${commonRules}`;
+  const etfGuide = `너는 ETF 복기 코치다. 상품 구조, 비용, 분배금, 포트폴리오 역할을 본다. ${commonRules}`;
 
   if (tradeType === "long") return longGuide;
   if (tradeType === "swing") return swingGuide;
@@ -31,9 +29,7 @@ function getInstruction(tradeType: TradeType) {
   return etfGuide;
 }
 
-// =========================================================
-// 🛠️ 헬퍼 함수들
-// =========================================================
+// ✅ [기능 유지] 헬퍼 함수들
 function jsonResponse(payload: any, status = 200) {
   return NextResponse.json(payload, {
     status,
@@ -55,7 +51,7 @@ export async function OPTIONS() {
 async function safeReadJson(req: Request) {
   try {
     const text = await req.text();
-    return text ? JSON.parse(text) : null;
+    return text && text.trim() ? JSON.parse(text) : null;
   } catch {
     return null;
   }
@@ -63,15 +59,19 @@ async function safeReadJson(req: Request) {
 
 async function parseOpenAIResponse(res: Response) {
   const raw = await res.text();
-  try {
-    return { raw, data: JSON.parse(raw) };
-  } catch {
-    return { raw, data: null };
-  }
+  try { return { raw, data: JSON.parse(raw) }; } catch { return { raw, data: null }; }
+}
+
+// ✅ [가격 멱살 차단] AI가 아는 척하며 뱉는 가격 패턴($XXX)을 서버에서 물리적으로 삭제
+function filterPriceHallucination(text: string): string {
+  return text
+    .replace(/\$\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?/g, "[데이터 없음]")
+    .replace(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*달러\b/g, "[데이터 없음]")
+    .replace(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*불\b/g, "[데이터 없음]");
 }
 
 // =========================================================
-// 🚀 POST 함수
+// 🚀 POST 메인 함수
 // =========================================================
 export async function POST(req: Request) {
   try {
@@ -86,6 +86,7 @@ export async function POST(req: Request) {
     let userPrompt: any = "";
     let temp = 0.3;
 
+    // --- [분기 1] 비전 분석 (기능 유지) ---
     if (body.type === "vision" && body.imageBase64) {
       model = "gpt-4o";
       temp = 0;
@@ -94,80 +95,78 @@ export async function POST(req: Request) {
         { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight 추출." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } },
       ];
-    } 
+    }
+    // --- [분기 2] 비교 분석 (기능 유지) ---
     else if (body.type === "comparison") {
-      systemPrompt = "투자 고수로서 포트폴리오를 냉철하게 분석하라.";
+      const experts: any = { warren_buffett: "워런 버핏", nancy_pelosi: "낸시 펠로시", cathie_wood: "캐시 우드", ray_dalio: "레이 달리오", michael_burry: "마이클 버리", korean_top1: "한국 1% 고수" };
+      systemPrompt = `너는 ${experts[body.expertId] || "투자 고수"}다. 사용자의 포트폴리오를 냉철하게 분석하라.`;
       userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언 작성.`;
-    } 
+    }
+    // --- [분기 3] 매매 복기 (기능 유지) ---
     else if (body.tradeType) {
       systemPrompt = getInstruction(normalizeTradeType(body.tradeType));
-      userPrompt = `[종목] ${body.ticker} [진입가] ${body.entryPrice} [메모] ${body.reasonNote}`;
-    } 
-    // --- [분기 4] 종목 심층 분석 (비유 설명 추가 버전) ---
+      userPrompt = `[종목] ${body.ticker} [진입가] ${body.entryPrice} [손절가] ${body.stopLoss || "N/A"} [메모] ${body.reasonNote || ""}`;
+    }
+    // --- [분기 4] 종목 심층 분석 (수정 포인트: 가격 차단 + 지표별 독립 분석 + 비유) ---
     else {
       const ticker = String(body.ticker || "UNKNOWN").toUpperCase();
       
-      // ✅ Undefined 방어막
+      // ✅ 넷플릭스/로켓랩 Undefined 방어: 비어있으면 "데이터 없음"으로 치환
       const per = body.manualPer || "데이터 없음";
       const roe = body.manualRoe || "데이터 없음";
       const pbr = body.manualPbr || "데이터 없음";
       const psr = body.manualPsr || "데이터 없음";
 
-      temp = 0.3; // 비유를 풍부하게 하기 위해 온도를 살짝 올림
+      temp = 0.2; 
       systemPrompt = `
-너는 어려운 주식 지표를 초보자도 한눈에 이해하게 설명하는 '친절한 월가 수석 애널리스트'다.
+너는 어려운 주식 지표를 초보자에게 비유로 설명해주는 월가 애널리스트다. 
 현재 시점은 **2026년 1월 18일**이다.
 
-[🚨 분석 및 설명 원칙]
-1. 지표별 독립 분석: PER, ROE, PBR, PSR을 절대 묶지 말고 각각 독립된 섹션으로 설명하라.
-2. 쉬운 비유 필수: 각 지표의 정의를 설명할 때, '붕어빵 장사', '부동산', '은행 예금' 등 실생활 비유를 반드시 1줄 이상 포함하라.
-   - 예 (PER): "이 기업이 버는 돈 대비 몸값이 얼마인지 보여줍니다. (비유: 연봉 1억인 사람의 몸값을 10억으로 쳐줄지, 100억으로 쳐줄지 결정하는 것과 같습니다.)"
-   - 예 (ROE): "자기 자본으로 얼마나 알차게 수익을 냈는지 보여줍니다. (비유: 내 돈 1억으로 카페를 차려 1년에 2천만 원을 벌었다면 ROE는 20%가 됩니다.)"
-3. 수치 기반 분석: 사용자가 입력한 수치가 "데이터 없음"인 경우 해당 지표 분석 섹션 자체를 출력하지 마라.
-4. 가격 언급 금지: 주가(Price)를 추측하거나 언급하지 마라.
-5. 섹션 구성: 지표별 설명 -> 산업 사이클 분석 -> 종합 결론 순서로 작성하라.
-
-[금지 사항]
-- 분할 매수, 수익 실현 등 투자 행동 제안은 절대로 하지 마라.
-- 오직 객관적인 데이터 분석과 시장 상태만 제공하라.
+[🚨 절대 엄수 규칙]
+1. 가격(Price) 언급 금지: 테슬라 등 종목의 시세를 아는 척하지 마라. 숫자가 나오면 시스템 에러로 간주한다.
+2. 지표별 독립 분석: PER, ROE, PBR, PSR을 한 문단에 합치지 말고 각각 독립된 섹션으로 나누어라.
+3. 실생활 비유 포함: 각 지표 설명 시 '붕어빵 장사', '부동산', '용돈' 등에 비유한 설명을 반드시 1줄 포함하라.
+4. 출력 구조: 
+   ### 🏭 1. 산업 사이클 및 현재 위치
+   (산업 상황 분석)
+   ---
+   ### 📊 2. 핵심 지표별 상세 진단
+   - **PER**: (비유 설명) -> (수치 해석)
+   - **ROE**: (비유 설명) -> (수치 해석)
+   - **PBR**: (비유 설명) -> (수치 해석)
+   - **PSR**: (비유 설명) -> (수치 해석)
+   ---
+   ### 💡 3. 종합 투자 포인트
+   (객관적 분석 데이터만 제공할 것. 매수/매도 제안 금지)
 `.trim();
 
-      userPrompt = `
-종목: ${ticker}
-[분석 데이터]
-- PER: ${per}
-- ROE: ${roe}
-- PBR: ${pbr}
-- PSR: ${psr}
-
-초보자도 이해할 수 있게 각 지표를 비유와 함께 개별적으로 분석해주고, 산업 위치와 최종 결론을 내줘.
-`.trim();
+      userPrompt = `종목: ${ticker}\n[데이터]\n- PER: ${per}\n- ROE: ${roe}\n- PBR: ${pbr}\n- PSR: ${psr}\n\n위 데이터를 정갈하게 지표별로 나누어 분석하라.`.trim();
     }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       cache: "no-store",
       body: JSON.stringify({
         model,
         temperature: temp,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+        messages: [ { role: "system", content: systemPrompt }, { role: "user", content: userPrompt } ],
       }),
     });
 
     const { raw, data } = await parseOpenAIResponse(res);
-    if (!res.ok) return jsonResponse({ ok: false, text: "API 에러 발생" }, 500);
+    if (!res.ok) return jsonResponse({ ok: false, text: "API 에러" }, 500);
 
-    const text = data?.choices?.[0]?.message?.content ?? "";
+    let text = data?.choices?.[0]?.message?.content ?? "";
+
+    // ✅ 서버 후처리: 심층 분석 시 AI가 뱉은 잔여 가격 정보 물리적 제거
+    if (!body.type && !body.tradeType) {
+      text = filterPriceHallucination(text);
+    }
+
     return jsonResponse({ ok: true, text, content: text }, 200);
 
   } catch (e: any) {
-    return jsonResponse({ ok: false, text: "서버 오류 발생" }, 500);
+    return jsonResponse({ ok: false, text: `서버 오류: ${e.message}` }, 500);
   }
 }
