@@ -17,6 +17,15 @@ function AlertModal({ isOpen, message, onClose }: { isOpen: boolean; message: st
   );
 }
 
+const EXPERTS = [
+  { id: "warren_buffett", name: "워런 버핏", emoji: "👴" },
+  { id: "nancy_pelosi", name: "낸시 펠로시", emoji: "🏛️" },
+  { id: "cathie_wood", name: "캐시 우드", emoji: "🚀" },
+  { id: "ray_dalio", name: "레이 달리오", emoji: "🌊" },
+  { id: "michael_burry", name: "마이클 버리", emoji: "📉" },
+  { id: "korean_top1", name: "국내 1% 고수", emoji: "🇰🇷" },
+];
+
 const HISTORY_KEY = "analysis_history_v1";
 const FREE_HISTORY_LIMIT = 10;
 
@@ -41,11 +50,12 @@ export default function UpgradePage() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState("");
-  const [matchingResult, setMatchingResult] = useState<any>(null); // 진단 점수용
+  const [matchingResult, setMatchingResult] = useState<any>(null);
   const [ticker, setTicker] = useState("");
   const [manualData, setManualData] = useState({ per: "", roe: "", pbr: "", psr: "" });
   const [portfolio, setPortfolio] = useState<{ ticker: string; weight: number }[]>([]);
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
+  const [selectedExpert, setSelectedExpert] = useState("warren_buffett");
   const [history, setHistory] = useState<any[]>([]);
   const matchingCardRef = useRef<HTMLDivElement>(null);
 
@@ -69,22 +79,22 @@ export default function UpgradePage() {
     setMatchingResult(h.matchingResult || null);
     if (h.manualData) setManualData(h.manualData);
     if (h.portfolio) setPortfolio(h.portfolio);
-    showAlert("이전 분석 기록을 불러왔습니다.");
+    showAlert("기록을 불러왔습니다.");
   };
 
   const clearHistoryAll = () => { setHistory([]); localStorage.removeItem(HISTORY_KEY); };
 
   const shareAnalysisResult = async () => {
     const shareData = {
-      title: "AI 투자 건전성 진단",
-      text: `${ticker ? ticker : '내 포트폴리오'} 진단 결과입니다.\n\n${result.substring(0, 100)}...`,
+      title: "AI 투자 심층 분석 결과",
+      text: `${ticker ? ticker : '내 포트폴리오'} 분석 결과입니다.\n\n${result.substring(0, 100)}...`,
       url: window.location.href,
     };
     if (navigator.share) {
       try { await navigator.share(shareData); } catch (e) { showAlert("공유를 취소했습니다."); }
     } else {
       await copyText(`${shareData.text}\n\n결과 보기: ${shareData.url}`);
-      showAlert("진단 요약이 클립보드에 복사되었습니다.");
+      showAlert("분석 요약이 클립보드에 복사되었습니다.");
     }
   };
 
@@ -94,9 +104,9 @@ export default function UpgradePage() {
       const canvas = await html2canvas(matchingCardRef.current, { scale: 2 });
       canvas.toBlob(async (blob) => {
         if (!blob) return;
-        const file = new File([blob], "health_report.png", { type: "image/png" });
+        const file = new File([blob], "match_report.png", { type: "image/png" });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: "포트폴리오 건전성 리포트" });
+          await navigator.share({ files: [file], title: "고수 매칭 리포트" });
         } else {
           await shareAnalysisResult();
         }
@@ -137,13 +147,11 @@ export default function UpgradePage() {
 
   const handleSubmit = async () => {
     if (mode === "single" && !ticker.trim()) return showAlert("종목명을 입력해주세요.");
-    if (mode === "portfolio" && portfolio.length === 0) return showAlert("분석할 종목을 추가해주세요.");
-    
     setLoading(true); setResult(""); setMatchingResult(null);
     try {
       const payload = mode === "single" 
         ? { ticker: ticker.trim().toUpperCase(), manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } 
-        : { type: "diagnosis", portfolio }; // 타입을 diagnosis로 변경
+        : { type: "comparison", portfolio, expertId: selectedExpert };
       
       const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
@@ -154,11 +162,13 @@ export default function UpgradePage() {
       
       let currentMatch = null;
       if (mode === "portfolio") {
+        const sel = EXPERTS.find(e => e.id === selectedExpert);
+        // ✅ [수정] data.matchRate가 0일 때도 0%로 정확히 표시되도록 수정
         const rate = (data.matchRate !== undefined && data.matchRate !== null) ? data.matchRate : 0;
         currentMatch = { 
-          expertName: "건전성", 
+          expertName: sel?.name, 
           matchRate: rate, 
-          emoji: "🛡️" 
+          emoji: sel?.emoji 
         };
         setMatchingResult(currentMatch);
       }
@@ -183,7 +193,7 @@ export default function UpgradePage() {
       </div>
 
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>AI 투자 심층 분석</h1>
-      <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>지표 및 자산 건전성 정밀 리포트</p>
+      <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>지표 기반 정밀 진단 리포트</p>
 
       {/* 이미지 업로드 */}
       <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center" }}>
@@ -204,16 +214,14 @@ export default function UpgradePage() {
         {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>}
       </section>
 
-      {/* 모드 전환 */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["single", "portfolio"].map((m) => (
           <button key={m} onClick={() => setMode(m as any)} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: mode === m ? "#111827" : "#fff", color: mode === m ? "#fff" : "#111827", fontWeight: 800 }}>
-            {m === "single" ? "🔍 지표 분석" : "🛡️ 건전성 진단"}
+            {m === "single" ? "🔍 지표 분석" : "🏆 고수 비교"}
           </button>
         ))}
       </div>
 
-      {/* 입력 영역 */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", marginBottom: 20 }}>
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
@@ -241,58 +249,59 @@ export default function UpgradePage() {
                 </div>
               ))}
             </div>
-            {/* 고수 선택 가이드 텍스트로 대체 */}
-            <div style={{ padding: "12px", borderRadius: 12, background: "#f9fafb", border: "1px dashed #d1d5db", fontSize: 12, color: "#6b7280", textAlign: "center", fontWeight: 600 }}>
-              보유 종목의 비중을 토대로 자산 배분의 건전성을 진단합니다.
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {EXPERTS.map(exp => (
+                <button key={exp.id} onClick={() => setSelectedExpert(exp.id)} style={{ padding: "12px 4px", borderRadius: 12, border: selectedExpert === exp.id ? "2px solid #2563eb" : "1px solid #e5e7eb", background: selectedExpert === exp.id ? "#eff6ff" : "#fff" }}>
+                  <div style={{ fontSize: 20 }}>{exp.emoji}</div>
+                  <div style={{ fontSize: 11, fontWeight: 800 }}>{exp.name}</div>
+                </button>
+              ))}
             </div>
           </div>
         )}
       </section>
 
-      {/* 실행 버튼 */}
       <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16, marginBottom: 20 }}>
-        {loading ? "AI 진단 중..." : "분석 시작하기"}
+        {loading ? "AI 분석 중..." : "분석 시작하기"}
       </button>
 
-      {/* 진단 결과 카드 */}
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>HEALTH REPORT</div>
-          <div style={{ fontSize: 20, fontWeight: 900 }}>포트폴리오 건강 점수: {matchingResult.matchRate}점</div>
+          <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
+          <div style={{ fontSize: 20, fontWeight: 900 }}>{matchingResult.expertName} 일치도 {matchingResult.matchRate}%</div>
           <div style={{ fontSize: 48, margin: "12px 0" }}>{matchingResult.emoji}</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={async () => {
               const canvas = await html2canvas(matchingCardRef.current!, { scale: 2 });
-              const link = document.createElement("a"); link.href = canvas.toDataURL(); link.download = "health_score.png"; link.click();
+              const link = document.createElement("a"); link.href = canvas.toDataURL(); link.download = "result.png"; link.click();
             }} style={{ flex: 1, fontSize: 12, background: "#111827", color: "#fff", padding: "12px", borderRadius: 12, border: "none", fontWeight: 800 }}>이미지 저장</button>
             <button onClick={shareMatchingReport} style={{ flex: 1, fontSize: 12, background: "#2563eb", color: "#fff", padding: "12px", borderRadius: 12, border: "none", fontWeight: 800 }}>공유하기</button>
           </div>
         </section>
       )}
 
-      {/* 분석 결과 리포트 */}
       {result && (
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
           <div className="markdown-body" style={{ color: "#1f2937" }}>
             <ReactMarkdown components={{
-              h2: ({node, ...props}) => <h2 style={{fontSize: '20px', fontWeight: 800, marginTop: '36px', marginBottom: '16px', color: '#111827', borderBottom: '2px solid #f3f4f6', paddingBottom: '10px'}} {...props} />,
+              // ✅ [수정] 가독성 향상을 위해 여백과 구분 스타일 대폭 강화
+              h2: ({node, ...props}) => <h2 style={{fontSize: '20px', fontWeight: 800, marginTop: '32px', marginBottom: '16px', color: '#111827', borderBottom: '2px solid #f3f4f6', paddingBottom: '10px'}} {...props} />,
               h3: ({node, ...props}) => <h3 style={{fontSize: '17px', fontWeight: 800, marginTop: '24px', marginBottom: '12px', color: '#1f2937'}} {...props} />,
               p: ({node, ...props}) => <p style={{marginBottom: '20px', color: '#374151', letterSpacing: '-0.01em', lineHeight: '1.9'}} {...props} />,
               li: ({node, ...props}) => <li style={{marginBottom: '12px', color: '#374151'}} {...props} />,
-              hr: ({node, ...props}) => <hr style={{margin: '40px 0', border: '0', borderTop: '2px solid #f3f4f6'}} {...props} />,
+              hr: ({node, ...props}) => <hr style={{margin: '32px 0', border: '0', borderTop: '2px solid #f3f4f6'}} {...props} />,
               strong: ({node, ...props}) => <strong style={{fontWeight: 800, color: '#2563eb'}} {...props} />
             }}>
               {result}
             </ReactMarkdown>
           </div>
-          <button onClick={shareAnalysisResult} style={{ marginTop: 24, width: "100%", padding: "14px", background: "#f3f4f6", color: "#111827", fontWeight: 800, borderRadius: 12, border: "none", fontSize: 13 }}>📋 진단 결과 공유하기</button>
+          <button onClick={shareAnalysisResult} style={{ marginTop: 24, width: "100%", padding: "14px", background: "#f3f4f6", color: "#111827", fontWeight: 800, borderRadius: 12, border: "none", fontSize: 13 }}>📋 분석 결과 공유하기</button>
         </section>
       )}
 
-      {/* 분석 기록 */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 진단 기록</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 분석 기록</h2>
           <button onClick={clearHistoryAll} style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none" }}>전체 삭제</button>
         </div>
         <div style={{ display: "grid", gap: 10 }}>
@@ -301,7 +310,7 @@ export default function UpgradePage() {
               <div><div style={{ fontWeight: 900, fontSize: 14 }}>{h.ticker}</div><div style={{ fontSize: 11, color: "#6b7280" }}>{formatDateTime(h.createdAt)}</div></div>
               <button onClick={() => loadHistoryItem(h)} style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #111827", background: "white", fontWeight: 900, fontSize: 12 }}>불러오기</button>
             </div>
-          )) : <div style={{ textAlign: "center", padding: "20px 0", color: "#9ca3af" }}>진단 기록이 없습니다.</div>}
+          )) : <div style={{ textAlign: "center", padding: "20px 0", color: "#9ca3af" }}>기록이 없습니다.</div>}
         </div>
       </section>
     </main>
