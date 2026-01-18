@@ -162,36 +162,34 @@ export default function UpgradePage() {
 
         const rawContent = data.text || data.content || "";
         
-        // ✅ [수술 포인트] 순수 JSON만 추출하는 강력한 정규식 및 파싱 로직
-        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("데이터 형식이 올바르지 않습니다.");
+        // 🔥 [절대 세척] 중괄호 {} 사이의 가장 큰 덩어리만 골라냄
+        const match = rawContent.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error("유효한 데이터를 찾을 수 없습니다.");
         
-        const finalJson = jsonMatch[0];
-        const parsed = JSON.parse(finalJson);
+        const jsonStr = match[0];
+        const parsed = JSON.parse(jsonStr);
         
         const item = parsed.extracted?.[0];
         if (item) {
           setUploadStatus("✅ 자동 입력 완료!");
-          if (item.weight && item.weight !== "N/A") {
+          if (item.weight && item.weight !== "N/A" && item.weight !== "") {
             setMode("portfolio"); 
-            setPortfolio((prev) => [...prev, { ticker: item.ticker.toUpperCase(), weight: Number(item.weight) }]);
+            setPortfolio((prev) => [...prev, { ticker: String(item.ticker).toUpperCase(), weight: Number(item.weight) }]);
           } else {
             setMode("single"); 
-            setTicker(item.ticker.toUpperCase());
+            setTicker(String(item.ticker).toUpperCase());
             setManualData({ 
-              per: item.per && item.per !== "N/A" ? item.per : "", 
-              roe: item.roe && item.roe !== "N/A" ? item.roe : "", 
-              pbr: item.pbr && item.pbr !== "N/A" ? item.pbr : "", 
-              psr: item.psr && item.psr !== "N/A" ? item.psr : "" 
+              per: item.per && item.per !== "N/A" ? String(item.per) : "", 
+              roe: item.roe && item.roe !== "N/A" ? String(item.roe) : "", 
+              pbr: item.pbr && item.pbr !== "N/A" ? String(item.pbr) : "", 
+              psr: item.psr && item.psr !== "N/A" ? String(item.psr) : "" 
             });
           }
-        } else {
-          throw new Error("데이터 구조 오류");
         }
       } catch (err) { 
         console.error("Vision Error:", err);
-        setUploadStatus("❌ 분석 실패 (인식할 수 없는 이미지)");
-        showAlert("이미지에서 지표를 읽지 못했습니다. 직접 입력하거나 다른 사진을 써주세요.");
+        setUploadStatus("❌ 인식 실패 (직접 입력 권장)");
+        // 💡 에러 메시지는 띄우되 화면이 멈추지 않도록 처리
       } finally { 
         setVisionLoading(false); 
       }

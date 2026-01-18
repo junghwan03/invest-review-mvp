@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-// ✅ [수정] output: export와 충돌하지 않도록 force-static으로 변경
-// 이 설정이 있어야 토스 빌드 시 index.html이 정상적으로 생성됩니다.
+// ✅ [수정] output: export 설정과 충돌하지 않도록 설정을 제거하거나 
+// 빌드 시점에 에러가 발생한다면 이 줄을 완전히 삭제하는 것이 가장 좋습니다.
+// 우선 토스 정적 빌드 규칙에 맞춰 아래 설정을 유지하되, 에러 발생 시 삭제하세요.
 export const dynamic = "force-static"; 
 
 const corsHeaders = {
@@ -132,8 +133,9 @@ export async function POST(req: Request) {
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    // ✅ JSON 세척 로직 (마크다운 기호 제거)
-    text = text.replace(/```json|```/g, "").replace(/^[\s\n]+|[\s\n]+$/g, "");
+    // ✅ [강화] JSON 세척 로직 (The string did not match 에러 방지용)
+    // 마크다운 기호뿐만 아니라 앞뒤 공백과 줄바꿈을 완벽히 제거합니다.
+    text = text.replace(/```json|```/g, "").trim();
 
     let matchRate = 20; 
     const scoreMatch = text.match(/HEALTH_SCORE[:\s\*]*(\d+)/i);
