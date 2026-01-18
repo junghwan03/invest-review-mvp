@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+// ✅ [추가] CORS 대응을 위한 헤더 설정
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// ✅ [추가] 토스 웹뷰의 사전 검사(OPTIONS) 요청 해결
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 type TradeType = "long" | "swing" | "day" | "etf";
 
 function normalizeTradeType(v: any): TradeType {
@@ -9,7 +21,6 @@ function normalizeTradeType(v: any): TradeType {
   return "long";
 }
 
-// ✅ [노선 1] 매매 복기 지시문 (괄호 제거 및 있음/없음 명확화)
 function getInstruction(tradeType: TradeType) {
   const commonRules = `
 너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
@@ -63,7 +74,6 @@ ${commonRules}`;
   return etfGuide;
 }
 
-// ✅ [노선 2] 고수 비교 (원본 로직 유지)
 function getDiagnosisInstruction(expertId: string) {
   const expertData: Record<string, string> = {
     warren_buffett: "정보기술 45%, 금융 30%, 소비재 15%, 에너지 10% (가치/현금흐름 중심)",
@@ -85,7 +95,6 @@ ${expertData[expertId] || expertData.warren_buffett}
 `.trim();
 }
 
-// ✅ [노선 3] 심층 지표 분석 (원본 로직 유지)
 function getAnalysisInstruction() {
   return `
 너는 '지표 분석 애널리스트'다. 아래 형식을 하나도 틀리지 말고 복사해서 빈칸만 채워라.
@@ -108,8 +117,15 @@ function getAnalysisInstruction() {
 `.trim();
 }
 
+// ✅ 기존 응답 함수에 CORS 헤더 통합
 function jsonResponse(payload: any, status = 200) {
-  return NextResponse.json(payload, { status, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } });
+  return NextResponse.json(payload, { 
+    status, 
+    headers: { 
+      "Cache-Control": "no-store", 
+      ...corsHeaders 
+    } 
+  });
 }
 
 export async function POST(req: Request) {
