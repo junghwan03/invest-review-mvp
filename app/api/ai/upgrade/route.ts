@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-// ✅ [수정] 토스 웹 프레임워크는 빌드 시 모든 API 경로를 정적으로 체크하려고 시도합니다.
-// 이 설정이 있어야 index.html 생성을 방해하지 않고 Vercel에서 정상 작동합니다.
-export const dynamic = "force-dynamic"; 
+// ✅ [수정] output: export와 충돌하지 않도록 force-static으로 변경
+// 이 설정이 있어야 토스 빌드 시 index.html이 정상적으로 생성됩니다.
+export const dynamic = "force-static"; 
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,8 +132,7 @@ export async function POST(req: Request) {
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    // ✅ [수정] JSON 세척 로직 강화 (문자열 매칭 에러 방지)
-    // AI가 응답 앞뒤에 붙이는 마크다운 기호를 더 확실하게 제거합니다.
+    // ✅ JSON 세척 로직 (마크다운 기호 제거)
     text = text.replace(/```json|```/g, "").replace(/^[\s\n]+|[\s\n]+$/g, "");
 
     let matchRate = 20; 
