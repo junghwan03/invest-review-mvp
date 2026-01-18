@@ -62,7 +62,7 @@ ${commonRules}`;
   return etfGuide;
 }
 
-// ✅ [노선 2] 고수 비교 (20~100% 단위 수정 및 테마 분석 강화)
+// ✅ [노선 2] 고수 비교 (20~100% 단위 및 테마 분석)
 function getDiagnosisInstruction(expertId: string) {
   const expertData: Record<string, string> = {
     warren_buffett: "정보기술 45%, 금융 30%, 소비재 15%, 에너지 10% (가치/현금흐름 중심)",
@@ -84,7 +84,7 @@ ${expertData[expertId] || expertData.warren_buffett}
 `.trim();
 }
 
-// ✅ [노선 3] 심층 지표 분석 (비유 리포트 형식)
+// ✅ [노선 3] 심층 지표 분석 (## 헤더 통일 버전)
 function getAnalysisInstruction() {
   return `
 너는 '지표 분석 애널리스트'다. 아래 형식을 하나도 틀리지 말고 복사해서 빈칸만 채워라.
@@ -138,7 +138,7 @@ export async function POST(req: Request) {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.3,
+        temperature: 0, // 💡 창의성 0% - 기계처럼 출력하도록 설정
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       }),
     });
@@ -146,16 +146,16 @@ export async function POST(req: Request) {
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    // 🚨 [핵심 수정] % 단위를 포함한 숫자 추출 로직 강화
-    let matchRate = 20; // 최소 점수 20점 기본값 설정
-    const scoreMatch = text.match(/HEALTH_SCORE[:\s]*(\d+)/i);
+    // 🚨 0% 귀신을 잡기 위한 강력한 숫자 추출 로직
+    let matchRate = 20; 
+    const scoreMatch = text.match(/HEALTH_SCORE[:\s\*]*(\d+)/i);
+    
     if (scoreMatch) {
       matchRate = parseInt(scoreMatch[1]);
-      // % 기호가 본문에 남아있지 않도록 정규표현식으로 줄 전체 삭제
-      text = text.replace(/HEALTH_SCORE[:\s]*\d+[%]?/gi, "").trim();
+      // 리포트 본문에서 점수 줄을 깔끔하게 제거
+      text = text.replace(/HEALTH_SCORE[:\s\*]*\d+[%]?/gi, "").trim();
     }
     
-    // 점수 범위 강제 (20~100)
     matchRate = Math.max(20, Math.min(100, matchRate));
 
     return jsonResponse({ ok: true, text, matchRate });
