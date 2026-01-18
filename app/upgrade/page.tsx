@@ -163,7 +163,7 @@ export default function UpgradePage() {
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
-        // ✅ [해결] 서버가 보낸 matchRate를 정확히 수신 (0일 때도 0으로 표시)
+        // ✅ [진짜 점수 반영] 서버에서 넘어온 matchRate를 사용함 (없으면 0)
         const rate = (data.matchRate !== undefined && data.matchRate !== null) ? data.matchRate : 0;
         currentMatch = { 
           expertName: sel?.name, 
@@ -284,7 +284,7 @@ export default function UpgradePage() {
         </section>
       )}
 
-      {/* 분석 결과 (가독성 개선 스타일 대폭 강화) */}
+      {/* 분석 결과 (가독성 개선 스타일 강화) */}
       {result && (
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
           <div className="markdown-body" style={{ color: "#1f2937" }}>
@@ -294,7 +294,7 @@ export default function UpgradePage() {
               h3: ({node, ...props}) => <h3 style={{fontSize: '17px', fontWeight: 800, marginTop: '24px', marginBottom: '12px', color: '#1f2937'}} {...props} />,
               p: ({node, ...props}) => <p style={{marginBottom: '20px', color: '#374151', letterSpacing: '-0.01em', lineHeight: '1.9'}} {...props} />,
               li: ({node, ...props}) => <li style={{marginBottom: '12px', color: '#374151'}} {...props} />,
-              hr: ({node, ...props}) => <hr style={{margin: '40px 0', border: '0', borderTop: '2px solid #f3f4f6'}} {...props} />,
+              hr: ({node, ...props}) => <hr style={{margin: '32px 0', border: '0', borderTop: '2px solid #f3f4f6'}} {...props} />,
               strong: ({node, ...props}) => <strong style={{fontWeight: 800, color: '#2563eb'}} {...props} />
             }}>
               {result}
