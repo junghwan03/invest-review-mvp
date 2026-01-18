@@ -27,7 +27,9 @@ const EXPERTS = [
 ];
 
 const HISTORY_KEY = "analysis_history_v1";
+const USAGE_KEY = "daily_usage_v1"; // 횟수 제한 키
 const FREE_HISTORY_LIMIT = 10;
+const DAILY_LIMIT = 3; // 하루 제한 횟수
 
 function formatDateTime(ts: number) {
   const d = new Date(ts);
@@ -57,13 +59,30 @@ export default function UpgradePage() {
   const [newStock, setNewStock] = useState({ ticker: "", weight: "" });
   const [selectedExpert, setSelectedExpert] = useState("warren_buffett");
   const [history, setHistory] = useState<any[]>([]);
+  const [usageCount, setUsageCount] = useState(0); // 사용 횟수 상태
   const matchingCardRef = useRef<HTMLDivElement>(null);
 
   const showAlert = (msg: string) => { setAlertMsg(msg); setIsAlertOpen(true); };
 
+  // 데이터 로드 및 날짜 체크
   useEffect(() => {
     const rawHistory = localStorage.getItem(HISTORY_KEY);
     if (rawHistory) setHistory(JSON.parse(rawHistory).slice(0, FREE_HISTORY_LIMIT));
+
+    // 일일 사용량 체크
+    const today = new Date().toISOString().split('T')[0];
+    const rawUsage = localStorage.getItem(USAGE_KEY);
+    if (rawUsage) {
+      const { date, count } = JSON.parse(rawUsage);
+      if (date === today) {
+        setUsageCount(count);
+      } else {
+        setUsageCount(0);
+        localStorage.setItem(USAGE_KEY, JSON.stringify({ date: today, count: 0 }));
+      }
+    } else {
+      localStorage.setItem(USAGE_KEY, JSON.stringify({ date: today, count: 0 }));
+    }
   }, []);
 
   const handleReset = () => {
@@ -157,6 +176,11 @@ export default function UpgradePage() {
   };
 
   const handleSubmit = async () => {
+    // 횟수 제한 체크
+    if (usageCount >= DAILY_LIMIT) {
+      return showAlert(`오늘 무료 횟수(${DAILY_LIMIT}회)를 모두 소모했습니다.\n내일 다시 이용해주세요!`);
+    }
+
     if (mode === "single" && !ticker.trim()) return showAlert("종목명을 입력해주세요.");
     setLoading(true); setResult(""); setMatchingResult(null);
     try {
@@ -171,6 +195,14 @@ export default function UpgradePage() {
       
       setResult(content);
       
+      // 횟수 카운트 업데이트 및 저장
+      const nextCount = usageCount + 1;
+      setUsageCount(nextCount);
+      localStorage.setItem(USAGE_KEY, JSON.stringify({ 
+        date: new Date().toISOString().split('T')[0], 
+        count: nextCount 
+      }));
+
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
@@ -211,7 +243,6 @@ export default function UpgradePage() {
           {!previewUrl ? (
             <div style={{ padding: "20px 0" }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>📸</div>
-              {/* ✅ [수정] 안내 문구 변경 및 빨간색 적용 */}
               <div style={{ fontSize: 14, fontWeight: 800, color: "#ef4444" }}>현재 고수 비교는 스크린샷은 지원하지 않습니다</div>
             </div>
           ) : (
@@ -272,11 +303,17 @@ export default function UpgradePage() {
         )}
       </section>
 
-      {/* ✅ [수정] 버튼 텍스트를 '리셋'으로 변경 */}
+      {/* ✅ 추가: 무료 사용 횟수 UI */}
+      <div style={{ marginBottom: 12, textAlign: "center" }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: usageCount >= DAILY_LIMIT ? "#ef4444" : "#4b5563" }}>
+          오늘 무료 사용: {usageCount} / {DAILY_LIMIT} (남은 횟수: {Math.max(0, DAILY_LIMIT - usageCount)})
+        </span>
+      </div>
+
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         <button onClick={handleReset} style={{ flex: 1, padding: "16px", borderRadius: 16, background: "#f3f4f6", color: "#111827", fontWeight: 900, border: "none", fontSize: 16 }}>리셋</button>
-        <button onClick={handleSubmit} disabled={loading} style={{ flex: 2, padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16 }}>
-          {loading ? "AI 분석 중..." : "분석 시작하기"}
+        <button onClick={handleSubmit} disabled={loading || usageCount >= DAILY_LIMIT} style={{ flex: 2, padding: "16px", borderRadius: 16, background: (loading || usageCount >= DAILY_LIMIT) ? "#d1d5db" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16 }}>
+          {loading ? "AI 분석 중..." : usageCount >= DAILY_LIMIT ? "사용 완료" : "분석 시작하기"}
         </button>
       </div>
 
@@ -284,9 +321,7 @@ export default function UpgradePage() {
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
           <div style={{ fontSize: 20, fontWeight: 900 }}>{matchingResult.expertName} 일치도 {matchingResult.matchRate}%</div>
-          {/* ✅ [수정] 점수 하단 빨간색 경고 문구 적용 */}
           <div style={{ fontSize: 12, fontWeight: 700, color: "#ef4444", marginTop: 4 }}>현재 점수는 제대로 나오지 않습니다</div>
-          
           <div style={{ fontSize: 48, margin: "12px 0" }}>{matchingResult.emoji}</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={async () => {
