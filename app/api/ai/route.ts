@@ -170,7 +170,7 @@ async function parseOpenAIResponse(res: Response) {
 }
 
 // =========================================================
-// 🚀 [수정됨] POST 함수: 전 종목 대응 심층 분석 통합
+// 🚀 [통합 수정본] POST 함수: 기능별 최적화 적용
 // =========================================================
 export async function POST(req: Request) {
   try {
@@ -185,42 +185,46 @@ export async function POST(req: Request) {
     let model = "gpt-4o-mini"; 
     let systemPrompt = "";
     let userPrompt: any = ""; 
+    let temp = 0.3; // 기본 온도 (복기 로직에 최적화)
 
     // --- [분기 1] 비전 분석 (스크린샷 인식) ---
     if (body.type === "vision" && body.imageBase64) {
       model = "gpt-4o"; 
-      systemPrompt = "주식 데이터 추출 전문가. JSON으로만 응답하라.";
+      temp = 0; // 데이터 추출은 정확도가 생명
+      systemPrompt = "주식 데이터 추출 전문가. 반드시 JSON 형식으로만 응답하라.";
       userPrompt = [
-        { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight(비중%) 추출." },
+        { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight(비중%)를 추출해 JSON으로 줘." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
       ];
     } 
-    // --- [분기 2] 고수 비교 분석 ---
+    // --- [분기 2] 고수 비교 분석 (Comparison) ---
     else if (body.type === "comparison") {
       const experts: any = {
         warren_buffett: "워런 버핏", nancy_pelosi: "낸시 펠로시", cathie_wood: "캐시 우드",
         ray_dalio: "레이 달리오", michael_burry: "마이클 버리", korean_top1: "한국 1% 고수"
       };
-      systemPrompt = `너는 ${experts[body.expertId] || "투자 고수"}다. 사용자의 포트폴리오를 분석하라.`;
-      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언 작성.`;
+      systemPrompt = `너는 ${experts[body.expertId] || "투자 고수"}다. 사용자의 포트폴리오를 냉철하게 분석하라.`;
+      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언을 작성하라.`;
+      temp = 0.35; // 고수다운 자연스러운 말투 허용
     } 
-    // --- [분기 3] 매매 복기 ---
+    // --- [분기 3] 매매 복기 (Trade Review - 기존 로직 유지) ---
     else if (body.tradeType) {
       const tradeType = normalizeTradeType(body.tradeType);
       systemPrompt = getInstruction(tradeType);
-      userPrompt = `[종목] ${String(body.ticker ?? "").toUpperCase()} [진입] ${body.entryPrice} [메모] ${body.reasonNote}`;
+      userPrompt = `[매매유형] ${tradeType} [종목] ${String(body.ticker ?? "").toUpperCase()} [진입가] ${body.entryPrice ?? ""} [메모] ${body.reasonNote ?? ""}`.trim();
+      temp = 0.3; // 코칭 가이드라인 준수와 유연한 피드백의 균형
     }
-    // --- [분기 4] 종목 심층 분석 (미국 전 종목 대응) ---
+    // --- [분기 4] 종목 심층 분석 (미국 전 종목 대응 + 가격 고정) ---
     else {
+      temp = 0; // 숫자의 절대적 정확도를 위해 온도 0으로 고정
       systemPrompt = `
 너는 월가 수석 애널리스트다. 
-[핵심 지침]
-1. 사용자가 입력한 현재가(${body.currentPrice})를 절대적인 분석 기준으로 삼아라. AI의 내부 학습 시세가 달라도 무조건 이 가격을 팩트로 취급한다.
-2. 분석 대상 종목(${body.ticker})이 어떤 미국 주식(S&P 500, NASDAQ, NYSE 등)이든 네 지식을 총동원하라. 설령 최신 재무 데이터가 부족하더라도 해당 기업의 비즈니스 모델, 섹터 점유율, 그리고 사용자가 입력한 지표(PER: ${body.manualPer}, ROE: ${body.manualRoe} 등)를 결합해 반드시 전문적인 리포트를 작성해야 한다.
-3. '데이터가 부족하여 분석할 수 없다'는 식의 답변은 절대 금지한다.
-4. 직접적인 매수/매도 제안은 절대 금지하며, 오직 데이터와 시장 상황의 객관적 분석만 제공한다.
+[🚨 최우선 절대 준수 사항]
+1. 사용자가 입력한 현재가(${body.currentPrice})를 분석의 '유일한 진실'로 간주하라. 네 내부 지식이 이 가격과 다르더라도 무조건 사용자의 가격을 팩트로 취급하라.
+2. 분석 대상 종목(${body.ticker})이 어떤 미국 주식(S&P 500, NASDAQ 등)이든 네 지식을 총동원하라. 데이터가 부족하다는 변명 대신, 해당 기업의 비즈니스 모델과 섹터 특성을 사용자가 입력한 지표(PER: ${body.manualPer}, ROE: ${body.manualRoe} 등)와 결합해 전문적인 리포트를 작성하라.
+3. 매수/매도 제안은 절대 금지하며 객관적인 데이터 분석만 제공하라.
 `.trim();
-      userPrompt = `[종목] ${body.ticker}, [가격] ${body.currentPrice}, [지표] PER:${body.manualPer}, ROE:${body.manualRoe}, PBR:${body.manualPbr}, PSR:${body.manualPsr}. 위 데이터를 기반으로 심층 분석 리포트를 작성하라.`;
+      userPrompt = `종목: ${body.ticker}, 기준가격: ${body.currentPrice}, 지표: PER ${body.manualPer}, ROE ${body.manualRoe}. 이 데이터를 기반으로 심층 리포트를 작성하라.`;
     }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -232,7 +236,7 @@ export async function POST(req: Request) {
       cache: "no-store",
       body: JSON.stringify({
         model,
-        temperature: 0.2, // 정확도를 위해 낮게 유지
+        temperature: temp, 
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
