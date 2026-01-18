@@ -5,6 +5,7 @@ export const runtime = "nodejs";
 
 // ✅ 횟수 제한 설정 (타입별 3회씩 분리)
 const DAILY_LIMIT_PER_TYPE = 3;
+// 장부 구조: { [IP]: { review: 0, analysis: 0, lastReset: '날짜' } }
 const USAGE_STORE: Record<string, { review: number; analysis: number; lastReset: string }> = {};
 
 const corsHeaders = {
@@ -25,7 +26,7 @@ function normalizeTradeType(v: any): TradeType {
   return "long";
 }
 
-// ✅ [노선 1] 매매 복기 지시문 (사용자 원본 100% 유지)
+// ✅ [노선 1] 매매 복기 지시문 (원본 100% 유지)
 function getInstruction(tradeType: TradeType) {
   const commonRules = `
 너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
@@ -62,7 +63,7 @@ function getInstruction(tradeType: TradeType) {
   return etfGuide;
 }
 
-// ✅ [노선 2] 고수 비교 지시문 (사용자 원본 100% 유지)
+// ✅ [노선 2] 고수 비교 지시문 (원본 100% 유지)
 function getDiagnosisInstruction(expertId: string) {
   const expertData: Record<string, string> = {
     warren_buffett: "정보기술 45%, 금융 30%, 소비재 15%, 에너지 10% (가치/현금흐름 중심)",
@@ -75,7 +76,7 @@ function getDiagnosisInstruction(expertId: string) {
   return `너는 '자산 배분 감사관'이다. HEALTH_SCORE: [숫자]%를 포함하라. 데이터: ${expertData[expertId] || expertData.warren_buffett}`;
 }
 
-// ✅ [노선 3] 심층 지표 분석 지시문 (사용자 원본 100% 유지)
+// ✅ [노선 3] 심층 지표 분석 지시문 (원본 100% 유지)
 function getAnalysisInstruction() {
   return `너는 '지표 분석 애널리스트'다. 지정된 형식을 엄수하라. ## 🌐 산업 사이클 분석...`;
 }
@@ -93,6 +94,7 @@ export async function POST(req: Request) {
     const ip = (headerList.get("x-forwarded-for") ?? "127.0.0.1").split(',')[0];
     const today = new Date().toISOString().split("T")[0];
 
+    // 1️⃣ IP별 장부 초기화
     if (!USAGE_STORE[ip] || USAGE_STORE[ip].lastReset !== today) {
       USAGE_STORE[ip] = { review: 0, analysis: 0, lastReset: today };
     }
@@ -100,9 +102,11 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     if (!body) return jsonResponse({ ok: false, text: "데이터 없음" }, 400);
 
+    // 2️⃣ 요청 타입 판별 (매매 복기 vs 심층 분석)
     const isAnalysis = body.type === "diagnosis" || body.type === "comparison" || body.type === "vision" || body.manualPer !== undefined;
     const currentType = isAnalysis ? "analysis" : "review";
 
+    // 3️⃣ 해당 타입의 횟수 체크
     if (USAGE_STORE[ip][currentType] >= DAILY_LIMIT_PER_TYPE) {
       const typeName = isAnalysis ? "심층 분석" : "매매 복기";
       return jsonResponse({ 
@@ -116,12 +120,12 @@ export async function POST(req: Request) {
     let systemPrompt = "";
     let userPrompt: any = "";
 
-    // 🚦 [추가] 스크린샷(Vision) 인식 분기
+    // 🚦 [수정] 스크린샷(Vision) 인식 분기 최적화
     if (body.type === "vision" && body.imageBase64) {
       systemPrompt = `너는 증권사 앱 스크린샷 판독 전문가다. 이미지에서 지표를 추출해라.
-      [규칙] 1. 설명 없이 JSON만 출력. 2. 종목명(ticker), 비중(weight), PER, ROE, PBR, PSR 추출. 3. 없으면 "N/A"`;
+      [규칙] 1. 설명 없이 오직 JSON만 출력. 2. 종목명(ticker), 비중(weight), PER, ROE, PBR, PSR 추출. 3. 없으면 "N/A"`;
       userPrompt = [
-        { type: "text", text: "이 이미지에서 주식 데이터를 추출해서 JSON으로 응답해라." },
+        { type: "text", text: "이 이미지에서 주식 지표 데이터를 추출해서 { \"extracted\": [ { \"ticker\": \"...\", \"weight\": \"...\", \"per\": \"...\", \"roe\": \"...\", \"pbr\": \"...\", \"psr\": \"...\" } ] } 형식의 JSON으로만 응답해라." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
       ];
     } 
@@ -141,7 +145,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4o-mini", // Vision 인식 가능한 모델
         temperature: 0,
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       }),
@@ -158,6 +162,7 @@ export async function POST(req: Request) {
     }
     matchRate = Math.max(20, Math.min(100, matchRate));
 
+    // 4️⃣ 성공 시 해당 타입 카운트만 증가
     USAGE_STORE[ip][currentType] += 1;
 
     return jsonResponse({ 
