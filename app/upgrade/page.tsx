@@ -160,18 +160,17 @@ export default function UpgradePage() {
       
       setResult(content);
       
-      let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
-        // ✅ [진짜 점수 반영] 서버에서 넘어온 matchRate를 사용함 (없으면 0)
-        currentMatch = { 
+        // ✅ 점수 표시 문제 해결: data.matchRate가 0일 때도 정상 표시되도록 처리
+        const rate = (data.matchRate !== undefined && data.matchRate !== null) ? data.matchRate : 0;
+        setMatchingResult({ 
           expertName: sel?.name, 
-          matchRate: data.matchRate !== null ? data.matchRate : 0, 
+          matchRate: rate, 
           emoji: sel?.emoji 
-        };
-        setMatchingResult(currentMatch);
+        });
       }
-      saveToHistory({ id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`, result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch });
+      saveToHistory({ id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`, result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: (mode === "portfolio") ? { expertName: selectedExpert, matchRate: data.matchRate, emoji: '' } : null });
     } catch { setResult("🚨 분석 중 오류가 발생했습니다."); } finally { setLoading(false); }
   };
 
@@ -283,20 +282,22 @@ export default function UpgradePage() {
         </section>
       )}
 
-      {/* 분석 결과 (가독성 개선 스타일 추가) */}
+      {/* 분석 결과 (가독성 개선 스타일 강화) */}
       {result && (
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
           <div className="markdown-body" style={{ color: "#1f2937" }}>
             <ReactMarkdown components={{
-              h2: ({node, ...props}) => <h2 style={{fontSize: '18px', fontWeight: 800, marginTop: '24px', marginBottom: '12px', color: '#111827'}} {...props} />,
-              p: ({node, ...props}) => <p style={{marginBottom: '16px'}} {...props} />,
-              li: ({node, ...props}) => <li style={{marginBottom: '8px'}} {...props} />,
-              hr: ({node, ...props}) => <hr style={{margin: '24px 0', border: '0', borderTop: '1px solid #e5e7eb'}} {...props} />
+              h2: ({node, ...props}) => <h2 style={{fontSize: '19px', fontWeight: 800, marginTop: '28px', marginBottom: '16px', color: '#111827', borderBottom: '1px solid #f3f4f6', paddingBottom: '8px'}} {...props} />,
+              h3: ({node, ...props}) => <h3 style={{fontSize: '17px', fontWeight: 700, marginTop: '24px', marginBottom: '12px', color: '#1f2937'}} {...props} />,
+              p: ({node, ...props}) => <p style={{marginBottom: '18px', color: '#374151', letterSpacing: '-0.01em'}} {...props} />,
+              li: ({node, ...props}) => <li style={{marginBottom: '10px', color: '#374151'}} {...props} />,
+              hr: ({node, ...props}) => <hr style={{margin: '32px 0', border: '0', borderTop: '2px solid #f3f4f6'}} {...props} />,
+              strong: ({node, ...props}) => <strong style={{fontWeight: 800, color: '#2563eb'}} {...props} />
             }}>
               {result}
             </ReactMarkdown>
           </div>
-          <button onClick={shareAnalysisResult} style={{ marginTop: 20, width: "100%", padding: "12px", background: "#f3f4f6", color: "#111827", fontWeight: 800, borderRadius: 12, border: "none", fontSize: 13 }}>📋 분석 결과 공유하기</button>
+          <button onClick={shareAnalysisResult} style={{ marginTop: 24, width: "100%", padding: "14px", background: "#f3f4f6", color: "#111827", fontWeight: 800, borderRadius: 12, border: "none", fontSize: 13 }}>📋 분석 결과 공유하기</button>
         </section>
       )}
 
