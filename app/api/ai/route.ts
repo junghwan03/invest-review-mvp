@@ -9,6 +9,9 @@ function normalizeTradeType(v: any): TradeType {
   return "long";
 }
 
+// =========================================================
+// 📝 [기록 보존] 매매 복기용 가이드라인 (절대 삭제 금지)
+// =========================================================
 function getInstruction(tradeType: TradeType) {
   const commonRules = `
 너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
@@ -117,6 +120,9 @@ ${commonRules}
   return etfGuide;
 }
 
+// =========================================================
+// 🛠️ [기존 코드 유지] 헬퍼 함수들
+// =========================================================
 function jsonResponse(payload: any, status = 200) {
   return NextResponse.json(payload, {
     status,
@@ -166,15 +172,13 @@ async function parseOpenAIResponse(res: Response) {
   return { raw, data: null as any };
 }
 
+// =========================================================
+// 🚀 [수정됨] POST 함수: 매매 복기 + 심층 분석 통합 로직
+// =========================================================
 export async function POST(req: Request) {
   try {
     const body = await safeReadJson(req);
-
-    const tickerRaw = body?.ticker ?? "";
-    const entryPrice = body?.entryPrice ?? "";
-    const stopLoss = body?.stopLoss ?? null;
-    const reasonNote = body?.reasonNote ?? "";
-    const tradeType = normalizeTradeType(body?.tradeType);
+    if (!body) return jsonResponse({ ok: false, text: "데이터가 없습니다." }, 400);
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -184,16 +188,47 @@ export async function POST(req: Request) {
       );
     }
 
-    const instruction = getInstruction(tradeType);
+    // ✅ 변수 선언 (타입 에러 방지를 위해 userPrompt를 any로 설정)
+    let model = "gpt-4o-mini"; 
+    let systemPrompt = "";
+    let userPrompt: any = ""; 
 
-    const userContext = `
+    // --- [분기 1] 비전 분석 (스크린샷 인식) ---
+    if (body.type === "vision" && body.imageBase64) {
+      model = "gpt-4o"; // 비전 인식은 4o 필수
+      systemPrompt = "너는 주식 데이터 추출 전문가다. 반드시 JSON 형식으로만 응답하라.";
+      userPrompt = [
+        { type: "text", text: "이미지에서 ticker, price, per, roe, pbr, psr, weight(비중%)를 추출해 JSON으로 줘." },
+        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
+      ];
+    } 
+    // --- [분기 2] 고수 비교 분석 (Comparison) ---
+    else if (body.type === "comparison") {
+      const experts: any = {
+        warren_buffett: "워런 버핏", nancy_pelosi: "낸시 펠로시", cathie_wood: "캐시 우드",
+        ray_dalio: "레이 달리오", michael_burry: "마이클 버리", korean_top1: "한국 1% 고수"
+      };
+      const expertName = experts[body.expertId] || "투자 고수";
+      systemPrompt = `너는 ${expertName}의 투자 철학을 가진 AI다. 사용자의 포트폴리오를 냉철하게 분석하라.`;
+      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석 및 조언을 작성하라.`;
+    } 
+    // --- [분기 3] 기존 매매 복기 (Trade Review) ---
+    else if (body.tradeType) {
+      const tradeType = normalizeTradeType(body.tradeType);
+      systemPrompt = getInstruction(tradeType);
+      userPrompt = `
 [매매유형] ${tradeType}
-[종목] ${String(tickerRaw).toUpperCase()}
-[진입가] ${entryPrice}
-[손절가] ${stopLoss === null || stopLoss === "" ? "N/A" : stopLoss}
-[메모]
-${reasonNote}
+[종목] ${String(body.ticker ?? "").toUpperCase()}
+[진입가] ${body.entryPrice ?? ""}
+[손절가] ${body.stopLoss === null || body.stopLoss === "" ? "N/A" : body.stopLoss}
+[메모] ${body.reasonNote ?? ""}
 `.trim();
+    }
+    // --- [분기 4] 종목 심층 분석 (Single Stock) ---
+    else {
+      systemPrompt = "너는 주식 분석 전문가다. 지표를 보고 심층 리포트를 작성하라. 매수/매도 제안 대신 객관적 데이터 분석만 제공할 것.";
+      userPrompt = `종목: ${body.ticker}, 가격: ${body.currentPrice}, PER: ${body.manualPer}, ROE: ${body.manualRoe}, PBR: ${body.manualPbr}, PSR: ${body.manualPsr}.`;
+    }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -203,11 +238,11 @@ ${reasonNote}
       },
       cache: "no-store",
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model: model,
         temperature: 0.35,
         messages: [
-          { role: "system", content: instruction.trim() },
-          { role: "user", content: userContext },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
       }),
     });
@@ -215,25 +250,15 @@ ${reasonNote}
     const { raw, data } = await parseOpenAIResponse(res);
 
     if (!res.ok) {
-      const msg =
-        data?.error?.message ||
-        (raw ? raw.slice(0, 400) : "OpenAI 응답이 비어 있습니다.");
+      const msg = data?.error?.message || (raw ? raw.slice(0, 400) : "OpenAI 응답이 비어 있습니다.");
       return jsonResponse({ ok: false, text: `OpenAI 에러 (${res.status}): ${msg}` }, 500);
     }
 
     const text = data?.choices?.[0]?.message?.content;
-    if (!text || typeof text !== "string") {
-      return jsonResponse(
-        {
-          ok: false,
-          text: "OpenAI 응답 파싱 실패(choices/message/content 없음)",
-          debug: raw?.slice(0, 400),
-        },
-        500
-      );
-    }
+    
+    // 프론트엔드 호환성을 위해 content와 text 모두 포함하여 응답
+    return jsonResponse({ ok: true, text, content: text }, 200);
 
-    return jsonResponse({ ok: true, text }, 200);
   } catch (e: any) {
     return jsonResponse({ ok: false, text: `서버 오류: ${String(e?.message ?? e)}` }, 500);
   }
