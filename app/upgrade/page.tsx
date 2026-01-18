@@ -163,7 +163,7 @@ export default function UpgradePage() {
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
-        // ✅ [수정] data.matchRate가 0일 때도 0%로 정확히 표시되도록 수정
+        // ✅ [해결] 서버가 보낸 matchRate를 정확히 수신 (0일 때도 0으로 표시)
         const rate = (data.matchRate !== undefined && data.matchRate !== null) ? data.matchRate : 0;
         currentMatch = { 
           expertName: sel?.name, 
@@ -214,6 +214,7 @@ export default function UpgradePage() {
         {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#2563eb" }}>{uploadStatus}</div>}
       </section>
 
+      {/* 모드 전환 */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["single", "portfolio"].map((m) => (
           <button key={m} onClick={() => setMode(m as any)} style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #e5e7eb", background: mode === m ? "#111827" : "#fff", color: mode === m ? "#fff" : "#111827", fontWeight: 800 }}>
@@ -222,6 +223,7 @@ export default function UpgradePage() {
         ))}
       </div>
 
+      {/* 입력 영역 */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", marginBottom: 20 }}>
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
@@ -261,10 +263,12 @@ export default function UpgradePage() {
         )}
       </section>
 
+      {/* 실행 버튼 */}
       <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16, marginBottom: 20 }}>
         {loading ? "AI 분석 중..." : "분석 시작하기"}
       </button>
 
+      {/* 매칭 카드 */}
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
@@ -280,16 +284,17 @@ export default function UpgradePage() {
         </section>
       )}
 
+      {/* 분석 결과 (가독성 개선 스타일 대폭 강화) */}
       {result && (
         <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
           <div className="markdown-body" style={{ color: "#1f2937" }}>
             <ReactMarkdown components={{
-              // ✅ [수정] 가독성 향상을 위해 여백과 구분 스타일 대폭 강화
-              h2: ({node, ...props}) => <h2 style={{fontSize: '20px', fontWeight: 800, marginTop: '32px', marginBottom: '16px', color: '#111827', borderBottom: '2px solid #f3f4f6', paddingBottom: '10px'}} {...props} />,
+              // ✅ [해결] h2, h3, p, hr 태그에 강력한 마진을 주어 텍스트 뭉침 현상 방지
+              h2: ({node, ...props}) => <h2 style={{fontSize: '20px', fontWeight: 800, marginTop: '36px', marginBottom: '16px', color: '#111827', borderBottom: '2px solid #f3f4f6', paddingBottom: '10px'}} {...props} />,
               h3: ({node, ...props}) => <h3 style={{fontSize: '17px', fontWeight: 800, marginTop: '24px', marginBottom: '12px', color: '#1f2937'}} {...props} />,
               p: ({node, ...props}) => <p style={{marginBottom: '20px', color: '#374151', letterSpacing: '-0.01em', lineHeight: '1.9'}} {...props} />,
               li: ({node, ...props}) => <li style={{marginBottom: '12px', color: '#374151'}} {...props} />,
-              hr: ({node, ...props}) => <hr style={{margin: '32px 0', border: '0', borderTop: '2px solid #f3f4f6'}} {...props} />,
+              hr: ({node, ...props}) => <hr style={{margin: '40px 0', border: '0', borderTop: '2px solid #f3f4f6'}} {...props} />,
               strong: ({node, ...props}) => <strong style={{fontWeight: 800, color: '#2563eb'}} {...props} />
             }}>
               {result}
@@ -299,6 +304,7 @@ export default function UpgradePage() {
         </section>
       )}
 
+      {/* 분석 기록 */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 분석 기록</h2>
