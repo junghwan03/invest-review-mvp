@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers"; // 횟수 제한용 헤더 임포트 추가
+import { headers } from "next/headers";
 
 export const runtime = "nodejs";
 
-// ✅ 하루 3회 제한을 위한 저장소 및 설정
+// ✅ 하루 3회 제한 저장소
 const DAILY_FREE_LIMIT = 3;
 const USAGE_STORE: Record<string, { count: number; lastReset: string }> = {};
 
+// ✅ CORS 및 보안 헤더 보강 (X-Requested-With 추가하여 차단 방지)
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+  "Access-Control-Max-Age": "86400",
 };
 
+// ✅ [수정] OPTIONS 요청에 대해 상태 코드 204로 명확하게 응답 (405 해결 핵심)
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+  return new Response(null, { status: 204, headers: corsHeaders });
 }
 
 type TradeType = "long" | "swing" | "day" | "etf";
@@ -82,12 +85,14 @@ function getAnalysisInstruction() {
 }
 
 function jsonResponse(payload: any, status = 200) {
-  return NextResponse.json(payload, { status, headers: { "Cache-Control": "no-store", ...corsHeaders } });
+  return NextResponse.json(payload, { 
+    status, 
+    headers: { "Cache-Control": "no-store", ...corsHeaders } 
+  });
 }
 
 export async function POST(req: Request) {
   try {
-    // 1️⃣ IP 기반 횟수 제한 로직 추가
     const headerList = await headers();
     const ip = (headerList.get("x-forwarded-for") ?? "127.0.0.1").split(',')[0];
     const today = new Date().toISOString().split("T")[0];
@@ -104,15 +109,13 @@ export async function POST(req: Request) {
       }, 429);
     }
 
-    const textBody = await req.text();
-    const body = textBody ? JSON.parse(textBody) : null;
+    const body = await req.json().catch(() => null);
     if (!body) return jsonResponse({ ok: false, text: "데이터 없음" }, 400);
 
     const apiKey = process.env.OPENAI_API_KEY;
     let systemPrompt = "";
     let userPrompt = "";
 
-    // 2️⃣ 기존 분기 로직 (매매복기 포함) 유지
     if (body.type === "diagnosis" || body.type === "comparison") {
       systemPrompt = getDiagnosisInstruction(body.expertId);
       userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 분석하라.`;
@@ -120,7 +123,6 @@ export async function POST(req: Request) {
       systemPrompt = getAnalysisInstruction();
       userPrompt = `종목: ${body.ticker}, PER: ${body.manualPer}, ROE: ${body.manualRoe}, PBR: ${body.manualPbr}, PSR: ${body.manualPsr}. 분석하라.`;
     } else {
-      // 🚨 매매 복기 노선 (보존 완료)
       const tradeType = normalizeTradeType(body?.tradeType);
       systemPrompt = getInstruction(tradeType);
       userPrompt = `[종목] ${body.ticker} [진입가] ${body.entryPrice} [메모] ${body.reasonNote}`;
@@ -128,7 +130,10 @@ export async function POST(req: Request) {
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { 
+        Authorization: `Bearer ${apiKey}`, 
+        "Content-Type": "application/json" 
+      },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         temperature: 0,
@@ -148,7 +153,6 @@ export async function POST(req: Request) {
     
     matchRate = Math.max(20, Math.min(100, matchRate));
 
-    // 3️⃣ 성공 시 카운트 증가
     USAGE_STORE[ip].count += 1;
 
     return jsonResponse({ 
@@ -159,6 +163,6 @@ export async function POST(req: Request) {
     });
 
   } catch (e: any) {
-    return jsonResponse({ ok: false, text: "서버 오류" }, 500);
+    return jsonResponse({ ok: false, text: "서버 오류: " + e.message }, 500);
   }
 }

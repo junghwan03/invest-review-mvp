@@ -1,5 +1,3 @@
-// app/page.tsx
-
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from "react";
@@ -134,7 +132,7 @@ function InputModal({
 }
 
 // =========================================================
-// 🧠 비즈니스 로직 (749줄 원본 로직 유지)
+// 🧠 비즈니스 로직 (원본 로직 유지)
 // =========================================================
 
 function getApiUrl(path: string) {
@@ -507,7 +505,8 @@ export default function Page() {
     setResult("AI가 리포트를 작성 중입니다...");
 
     try {
-      const API_URL = getApiUrl("/api/ai");
+      // ✅ [수정] 통합된 백엔드 경로로 변경하고 슬래시 중복 방지
+      const API_URL = getApiUrl("/api/ai/upgrade");
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -581,7 +580,7 @@ export default function Page() {
       <AlertModal isOpen={isAlertOpen} message={alertMsg} onClose={() => setIsAlertOpen(false)} />
       <InputModal isOpen={isInputOpen} title="프리셋 이름 저장" placeholder="예: 내 단타 규칙" onConfirm={handlePresetSaveConfirm} onCancel={() => setIsInputOpen(false)} />
 
-      {/* 🚀 서비스 선택 메뉴: 심층 분석 페이지 박스 크기와 완벽 통일 */}
+      {/* 🚀 서비스 선택 메뉴 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 30 }}>
         <button 
           onClick={() => window.location.href = '/'}
