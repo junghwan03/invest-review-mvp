@@ -94,7 +94,7 @@ export default function UpgradePage() {
       try { await navigator.share(shareData); } catch (e) { showAlert("공유를 취소했습니다."); }
     } else {
       await copyText(`${shareData.text}\n\n결과 보기: ${shareData.url}`);
-      showAlert("공유 기능이 지원되지 않는 브라우저입니다.");
+      showAlert("분석 요약이 클립보드에 복사되었습니다.");
     }
   };
 
@@ -111,7 +111,7 @@ export default function UpgradePage() {
           await shareAnalysisResult();
         }
       });
-    } catch (e) { showAlert("이미지 생성 중 오류가 발생했습니다."); }
+    } catch (e) { showAlert("이미지 생성 오류"); }
   };
 
   const handleVisionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,21 +152,27 @@ export default function UpgradePage() {
       const payload = mode === "single" 
         ? { ticker: ticker.trim().toUpperCase(), manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } 
         : { type: "comparison", portfolio, expertId: selectedExpert };
+      
       const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       const content = data.text || data.content || "";
       if (!content) throw new Error("데이터 없음");
+      
       setResult(content);
       
       let currentMatch = null;
       if (mode === "portfolio") {
         const sel = EXPERTS.find(e => e.id === selectedExpert);
-        // ✅ [수정] 랜덤 숫자 대신 AI가 계산한 data.matchRate를 사용함
-        currentMatch = { expertName: sel?.name, matchRate: data.matchRate || 0, emoji: sel?.emoji };
+        // ✅ [진짜 점수 반영] 서버에서 넘어온 matchRate를 사용함 (없으면 0)
+        currentMatch = { 
+          expertName: sel?.name, 
+          matchRate: data.matchRate !== null ? data.matchRate : 0, 
+          emoji: sel?.emoji 
+        };
         setMatchingResult(currentMatch);
       }
       saveToHistory({ id: Date.now(), createdAt: Date.now(), mode, ticker: mode === "single" ? ticker.toUpperCase() : `${portfolio.length}개 종목`, result: content, manualData: mode === "single" ? manualData : null, portfolio: mode === "portfolio" ? portfolio : null, matchingResult: currentMatch });
-    } catch { setResult("🚨 오류 발생"); } finally { setLoading(false); }
+    } catch { setResult("🚨 분석 중 오류가 발생했습니다."); } finally { setLoading(false); }
   };
 
   return (
@@ -188,7 +194,7 @@ export default function UpgradePage() {
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>AI 투자 심층 분석</h1>
       <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>지표 기반 정밀 진단 리포트</p>
 
-      {/* 스크린샷 업로드 영역 */}
+      {/* 이미지 업로드 */}
       <section style={{ marginBottom: 20, border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", textAlign: "center" }}>
         <label style={{ cursor: "pointer", display: "block" }}>
           {!previewUrl ? (
@@ -216,7 +222,7 @@ export default function UpgradePage() {
         ))}
       </div>
 
-      {/* 입력 섹션 */}
+      {/* 입력 영역 */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px", background: "#fff", marginBottom: 20 }}>
         {mode === "single" ? (
           <div style={{ display: "grid", gap: 12 }}>
@@ -257,13 +263,11 @@ export default function UpgradePage() {
       </section>
 
       {/* 실행 버튼 */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-        <button onClick={handleSubmit} disabled={loading} style={{ flex: 1, padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16 }}>
-          {loading ? "AI 분석 중..." : "분석 시작하기"}
-        </button>
-      </div>
+      <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "16px", borderRadius: 16, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", fontWeight: 900, border: "none", fontSize: 16, marginBottom: 20 }}>
+        {loading ? "AI 분석 중..." : "분석 시작하기"}
+      </button>
 
-      {/* 매칭 결과 카드 */}
+      {/* 매칭 카드 */}
       {matchingResult && (
         <section ref={matchingCardRef} style={{ padding: "24px 16px", border: "2px solid #2563eb", borderRadius: 20, textAlign: "center", background: "#fff", marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", marginBottom: 8 }}>MATCH REPORT</div>
@@ -279,15 +283,24 @@ export default function UpgradePage() {
         </section>
       )}
 
-      {/* 분석 결과 텍스트 */}
+      {/* 분석 결과 (가독성 개선 스타일 추가) */}
       {result && (
-        <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.7, marginBottom: 20 }}>
-          <ReactMarkdown>{result}</ReactMarkdown>
+        <section style={{ padding: "20px", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
+          <div className="markdown-body" style={{ color: "#1f2937" }}>
+            <ReactMarkdown components={{
+              h2: ({node, ...props}) => <h2 style={{fontSize: '18px', fontWeight: 800, marginTop: '24px', marginBottom: '12px', color: '#111827'}} {...props} />,
+              p: ({node, ...props}) => <p style={{marginBottom: '16px'}} {...props} />,
+              li: ({node, ...props}) => <li style={{marginBottom: '8px'}} {...props} />,
+              hr: ({node, ...props}) => <hr style={{margin: '24px 0', border: '0', borderTop: '1px solid #e5e7eb'}} {...props} />
+            }}>
+              {result}
+            </ReactMarkdown>
+          </div>
           <button onClick={shareAnalysisResult} style={{ marginTop: 20, width: "100%", padding: "12px", background: "#f3f4f6", color: "#111827", fontWeight: 800, borderRadius: 12, border: "none", fontSize: 13 }}>📋 분석 결과 공유하기</button>
         </section>
       )}
 
-      {/* 기록 섹션 */}
+      {/* 분석 기록 */}
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "white" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>최근 분석 기록</h2>
