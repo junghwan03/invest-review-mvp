@@ -9,124 +9,232 @@ function normalizeTradeType(v: any): TradeType {
   return "long";
 }
 
-// ✅ [노선 1] 매매 복기 (원본 보존)
 function getInstruction(tradeType: TradeType) {
-  const commonRules = `너는 "투자 복기 코치"다. 한국어로 답하라. 점수는 반드시 "N/10점" 형태로만 쓴다. 직접적 매매 제안 금지.`;
-  const guides = { long: "장기투자 코치.", swing: "스윙 코치.", day: "단타 코치.", etf: "ETF 코치." };
-  return `${guides[tradeType]} ${commonRules}`;
-}
+  const commonRules = `
+너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
+장황하지 않게, "기준/행동/숫자" 중심으로 쓴다.
+메모가 부실하면 "추가로 적어야 할 항목"을 구체적으로 요구한다.
 
-function filterPriceHallucination(text: string): string {
-  return text.replace(/\$\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?/g, "[시세 제외]")
-             .replace(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(USD|달러|원)\b/gi, "[시세 제외]");
+[점수 표기 규칙 - 매우 중요]
+- 점수는 반드시 "N/10점" 형태로만 쓴다. (예: 7/10점, 10/10점)
+- "7점"처럼 분모가 없는 표기는 금지.
+- 0~10 사이 정수만 사용.
+
+[출력 형식 고정]
+- 제목 1줄 (티커 포함)
+- 1) 한줄 총평 (최대 25자)
+- 2) 점수(각 항목 0~10점) + 한줄 근거  (반드시 N/10점 형식)
+  - 근거명확성: 7/10점 — (근거 한 줄)
+  - 리스크관리: 6/10점 — (근거 한 줄)
+  - 감정통제: 4/10점 — (근거 한 줄)
+  - 일관성: 5/10점 — (근거 한 줄)
+- 3) 감정 경고 (있/없 + 근거 1줄)
+- 4) 매매 유형 분류 (반드시 아래 값 중 하나로만 출력)
+  - 장기투자 / 스윙 / 단타 / ETF
+- 5) 개선 액션 3개 (각 1줄, 행동형)
+- 6) 다음 진입 체크리스트 5개 (체크박스 형태로 짧게)
+`;
+
+  const longGuide = `
+[역할]
+너는 장기/가치투자 복기 코치다. 단타/차트 얘기를 줄이고, 펀더멘털/가치/리스크를 본다.
+
+[중점 평가(장기 전용)]
+- 기업의 해자/경쟁우위/산업 포지션 언급 여부
+- 밸류에이션: PER/PBR/PS/FCF 중 최소 1개라도 "기준 숫자"가 있는지
+- 재무 안전성: 부채비율/현금흐름/이자보상배율 같은 리스크 체크가 있는지
+- 장기 시나리오: 1~3년 관점의 촉매/성장 가정이 있는지
+- Thesis break(생각 바뀌는 조건): '무슨 일이면 틀렸다고 인정할지' 명확한지
+
+[체크리스트는 장기 전용으로만]
+예) 밸류에이션 기준, 재무 리스크, 경쟁우위, 가정/리스크, thesis break
+
+[매매 유형 분류는 반드시 "장기투자"]
+${commonRules}
+`;
+
+  const swingGuide = `
+[역할]
+너는 스윙 트레이딩 복기 코치다. 며칠~몇 주 관점. 진입/손절/익절의 '숫자 기준'을 가장 중요하게 본다.
+
+[중점 평가(스윙 전용)]
+- 진입 트리거(패턴/뉴스/수급 등)가 한 문장으로 명확한지
+- 손절 기준이 숫자(%, 가격, 레벨)로 명확한지
+- 익절/분할익절 기준이 있는지
+- 손익비(RR) 의식이 있는지
+- 이벤트 리스크(실적/발표/매크로)를 고려했는지
+- 감정 개입(추격매수/물타기/계획 변경) 흔적
+
+[체크리스트는 스윙 전용으로만]
+예) 트리거, 손절 숫자, 익절/분할, RR, 이벤트 캘린더
+
+[매매 유형 분류는 반드시 "스윙"]
+${commonRules}
+`;
+
+  const dayGuide = `
+[역할]
+너는 단타 복기 코치다. 분/시간 단위. 실행 규칙과 손절 속도를 최우선으로 본다.
+
+[중점 평가(단타 전용)]
+- 즉시 손절 규칙(틱/퍼센트/레벨)이 있는지
+- 과매매/복수매매 신호가 있는지
+- 수수료/슬리피지 고려가 있는지
+- 진입이 추격인지(늦진입) 여부
+- 멘탈 붕괴 신호(조급/흥분/공포) 체크
+- 계획 대비 실행 일치(원칙 위반 여부)
+
+[체크리스트는 단타 전용으로만]
+예) 손절 트리거, 1회 최대손실, 재진입 금지 조건, 체결/호가 확인, 감정 체크
+
+[매매 유형 분류는 반드시 "단타"]
+${commonRules}
+`;
+
+  const etfGuide = `
+[역할]
+너는 ETF 복기 코치다. 개별 종목 분석보다 "상품 구조/추종지수/비용/분배금/리밸런싱/포트 역할"을 본다.
+단타/차트 얘기는 최소화하고 장기 자산배분 관점으로 지도한다.
+
+[중점 평가(ETF 전용)]
+- ETF의 역할: 코어/위성/배당/방어/성장/헤지 중 무엇인지 1문장으로 정의했는가?
+- 추종지수/전략: S&P500/나스닥/커버드콜/팩터/리츠/채권/레버리지/인버스 등 구조 이해가 있는가?
+- 비용: 총보수(TER) 또는 운용보수 인식이 있는가? “싸다/비싸다” 기준이 있는가?
+- 분배금: 기대한다면 분배금 변동성/재투자(재매수) 계획이 있는가?
+- 리밸런싱 규칙: 추가매수 조건(가격/비중/주기) + 중단 조건(전략이 깨지는 조건)이 있는가?
+- 리스크: 레버리지/환율/금리/섹터 편중 등 핵심 리스크를 1~2개라도 적었는가?
+
+[체크리스트는 ETF 전용으로만]
+예) 역할 정의, 지수/전략, 비용, 분배금/재투자, 리밸런싱/중단조건, 핵심 리스크
+
+[매매 유형 분류는 반드시 "ETF"]
+${commonRules}
+`;
+
+  if (tradeType === "long") return longGuide;
+  if (tradeType === "swing") return swingGuide;
+  if (tradeType === "day") return dayGuide;
+  return etfGuide;
 }
 
 function jsonResponse(payload: any, status = 200) {
-  return NextResponse.json(payload, { status, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } });
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function safeReadJson(req: Request) {
+  try {
+    const text = await req.text();
+    if (!text || !text.trim()) return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 async function parseOpenAIResponse(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
   const raw = await res.text();
-  try { return { raw, data: JSON.parse(raw) }; } catch { return { raw, data: null }; }
+
+  if (!raw || !raw.trim()) return { raw: "", data: null as any };
+
+  if (contentType.includes("application/json")) {
+    try {
+      return { raw, data: JSON.parse(raw) };
+    } catch {
+      return { raw, data: null as any };
+    }
+  }
+
+  return { raw, data: null as any };
 }
 
 export async function POST(req: Request) {
   try {
-    const textBody = await req.text();
-    const body = textBody ? JSON.parse(textBody) : null;
-    if (!body) return jsonResponse({ ok: false, text: "데이터 없음" }, 400);
+    const body = await safeReadJson(req);
+
+    const tickerRaw = body?.ticker ?? "";
+    const entryPrice = body?.entryPrice ?? "";
+    const stopLoss = body?.stopLoss ?? null;
+    const reasonNote = body?.reasonNote ?? "";
+    const tradeType = normalizeTradeType(body?.tradeType);
 
     const apiKey = process.env.OPENAI_API_KEY;
-    let model = "gpt-4o-mini";
-    let systemPrompt = "";
-    let userPrompt: any = "";
-    let temp = 0.1; // 💡 창의성을 완전히 죽여서 딴소리 못하게 함
-
-    // --- [분기 1] 비전 분석 ---
-    if (body.type === "vision") {
-      model = "gpt-4o"; temp = 0;
-      systemPrompt = "주식 데이터 추출 전문가. JSON 응답.";
-      userPrompt = [{ type: "text", text: "ticker, per, roe, pbr, psr 추출." }, { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }];
+    if (!apiKey) {
+      return jsonResponse(
+        { ok: false, text: "OPENAI_API_KEY가 없습니다. (Vercel Environment Variables 확인)" },
+        500
+      );
     }
-    // --- [분기 2] 건전성 진단 (버핏/고수 완전 차단) ---
-    else if (body.type === "diagnosis") {
-      model = "gpt-4o"; // 💡 지능이 높은 모델로 강제 격상
-      systemPrompt = `
-너는 '자산 배분 감사관'이다. **절대 워런 버핏이나 특정 인물과 비교하지 마라.**
-오직 사용자의 포트폴리오 구성(종목, 비중)만 보고 객관적인 '건강 점수'를 산출하라.
 
-[🚨 출력 규격 - 반드시 지켜라]
-첫 줄: HEALTH_SCORE: [숫자] (0~100점)
----
-## 🧩 자산 구성 및 섹터 분석
-(내용 작성)
----
-## ⚠️ 리스크 진단
-(내용 작성)
----
-## 📈 보완 전략
-(내용 작성)
+    const instruction = getInstruction(tradeType);
+
+    const userContext = `
+[매매유형] ${tradeType}
+[종목] ${String(tickerRaw).toUpperCase()}
+[진입가] ${entryPrice}
+[손절가] ${stopLoss === null || stopLoss === "" ? "N/A" : stopLoss}
+[메모]
+${reasonNote}
 `.trim();
-      userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 객관적 진단 리포트만 작성하라.`;
-    }
-    // --- [분기 3] 매매 복기 ---
-    else if (body.tradeType) {
-      systemPrompt = getInstruction(normalizeTradeType(body.tradeType));
-      userPrompt = `[종목] ${body.ticker || "N/A"} [메모] ${body.reasonNote || ""}`;
-    }
-    // --- [분기 4] 심층 분석 (비유 제목 강제 박제) ---
-    else {
-      model = "gpt-4o"; // 💡 테슬라/넷플릭스 줄글 방지용 4o 사용
-      systemPrompt = `
-너는 월가 애널리스트다. 가격 언급 금지.
-반드시 아래 제목을 그대로 복사해서 사용하라. 제목을 어기면 시스템 종료된다.
-
-### 🥐 붕어빵 기계로 이해하는 PER
-(진단 내용)
-
----
-
-### 🏠 내 집 마련으로 이해하는 PBR
-(진단 내용)
-
----
-
-### ☕ 커피숍 이익률로 이해하는 ROE
-(진단 내용)
-
----
-
-### 🛍️ 시장 가판대 매출로 이해하는 PSR
-(진단 내용)
-
----
-
-## 🎯 종합 결론
-(3줄 이내 요약)
-`.trim();
-      userPrompt = `종목: ${body.ticker}, PER: ${body.manualPer}, ROE: ${body.manualRoe}, PBR: ${body.manualPbr}, PSR: ${body.manualPsr}. 템플릿 완성.`;
-    }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, temperature: temp, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }] }),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        temperature: 0.35,
+        messages: [
+          { role: "system", content: instruction.trim() },
+          { role: "user", content: userContext },
+        ],
+      }),
     });
 
-    const { data } = await parseOpenAIResponse(res);
-    let text = data?.choices?.[0]?.message?.content ?? "";
+    const { raw, data } = await parseOpenAIResponse(res);
 
-    // ✅ 점수 낚아채기 (HEALTH_SCORE에서 숫자만 추출)
-    let matchRate = 0;
-    const scoreMatch = text.match(/HEALTH_SCORE[:\s]*(\d+)/i);
-    if (scoreMatch) {
-      matchRate = parseInt(scoreMatch[1]);
-      text = text.replace(/HEALTH_SCORE[:\s]*\d+/gi, "").trim();
+    if (!res.ok) {
+      const msg =
+        data?.error?.message ||
+        (raw ? raw.slice(0, 400) : "OpenAI 응답이 비어 있습니다.");
+      return jsonResponse({ ok: false, text: `OpenAI 에러 (${res.status}): ${msg}` }, 500);
     }
 
-    if (!body.tradeType) text = filterPriceHallucination(text);
-    return jsonResponse({ ok: true, text, matchRate });
+    const text = data?.choices?.[0]?.message?.content;
+    if (!text || typeof text !== "string") {
+      return jsonResponse(
+        {
+          ok: false,
+          text: "OpenAI 응답 파싱 실패(choices/message/content 없음)",
+          debug: raw?.slice(0, 400),
+        },
+        500
+      );
+    }
+
+    return jsonResponse({ ok: true, text }, 200);
   } catch (e: any) {
-    return jsonResponse({ ok: false, text: "서버 오류" }, 500);
+    return jsonResponse({ ok: false, text: `서버 오류: ${String(e?.message ?? e)}` }, 500);
   }
 }
