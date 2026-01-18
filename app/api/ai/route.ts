@@ -24,7 +24,7 @@ function getInstruction(tradeType: TradeType) {
 [출력 형식 고정]
 - 제목 1줄 (티커 포함)
 - 1) 한줄 총평 (최대 25자)
-- 2) 점수(각 항목 0~10점) + 한줄 근거  (반드시 N/10점 형식)
+- 2) 점수(각 항목 0~10점) + 한줄 근거 (반드시 N/10점 형식)
   - 근거명확성: 7/10점 — (근거 한 줄)
   - 리스크관리: 6/10점 — (근거 한 줄)
   - 감정통제: 4/10점 — (근거 한 줄)
@@ -62,7 +62,7 @@ ${commonRules}`;
   return etfGuide;
 }
 
-// ✅ [노선 2] 고수 비교 (모든 전문가 데이터 주입)
+// ✅ [노선 2] 고수 비교 (20~100% 단위 수정 및 테마 분석 강화)
 function getDiagnosisInstruction(expertId: string) {
   const expertData: Record<string, string> = {
     warren_buffett: "정보기술 45%, 금융 30%, 소비재 15%, 에너지 10% (가치/현금흐름 중심)",
@@ -74,32 +74,33 @@ function getDiagnosisInstruction(expertId: string) {
   };
 
   return `
-너는 '자산 배분 감사관'이다. 사용자의 포트폴리오를 선택된 고수의 데이터와 비교하라.
+너는 '자산 배분 감사관'이다. 사용자의 포트폴리오를 선택된 고수의 데이터와 포괄적으로 대조하라.
 [선택된 고수 데이터]
 ${expertData[expertId] || expertData.warren_buffett}
 
-위 비중 데이터와 사용자의 비중을 대조하여 얼마나 차이가 나는지 분석하라.
-첫 줄에 반드시 "HEALTH_SCORE: [숫자]" (0~100점)를 적고, 직접적 매수/매도 제안은 금지한다.
+위 비중 데이터와 사용자의 비중을 포괄적으로 대조하여 얼마나 차이가 나는지 분석하라.
+최대한 큰 테마(기술주, 전통주 등)로 묶어서 분석하라.
+첫 줄에 반드시 "HEALTH_SCORE: [숫자]%" (범위: 20~100%)를 적고, 직접적 매수/매도 제안은 금지한다.
 `.trim();
 }
 
 // ✅ [노선 3] 심층 지표 분석 (비유 리포트 형식)
 function getAnalysisInstruction() {
   return `
-너는 '지표 분석 애널리스트'다. 아래 형식을 1자도 틀리지 말고 복사해서 빈칸만 채워라.
+너는 '지표 분석 애널리스트'다. 아래 형식을 하나도 틀리지 말고 복사해서 빈칸만 채워라.
 [출력 형식]
 ## 🌐 산업 사이클 분석
 ---
-### 🥐 붕어빵 기계로 이해하는 PER
+## 🥐 붕어빵 기계로 이해하는 PER
 (진단)
 ---
-### 🏠 내 집 마련으로 이해하는 PBR
+## 🏠 내 집 마련으로 이해하는 PBR
 (진단)
 ---
-### ☕ 커피숍 이익률로 이해하는 ROE
+## ☕ 커피숍 이익률로 이해하는 ROE
 (진단)
 ---
-### 🛍️ 시장 가판대 매출로 이해하는 PSR
+## 🛍️ 시장 가판대 매출로 이해하는 PSR
 (진단)
 ---
 ## 🎯 종합 결론
@@ -120,13 +121,11 @@ export async function POST(req: Request) {
     let systemPrompt = "";
     let userPrompt = "";
 
-    // 💡 분기 처리
     if (body.type === "diagnosis" || body.type === "comparison") {
       systemPrompt = getDiagnosisInstruction(body.expertId);
       userPrompt = `내 포트폴리오: ${JSON.stringify(body.portfolio)}. 고수와 비교 분석 리포트를 작성하라.`;
     } else if (body.manualPer !== undefined) {
       systemPrompt = getAnalysisInstruction();
-      // 🚨 [수정 완료] userContext 선언 오타 수정 및 할당
       userPrompt = `종목: ${body.ticker}, PER: ${body.manualPer}, ROE: ${body.manualRoe}, PBR: ${body.manualPbr}, PSR: ${body.manualPsr}. 분석 리포트 완성하라.`;
     } else {
       const tradeType = normalizeTradeType(body?.tradeType);
@@ -147,13 +146,17 @@ export async function POST(req: Request) {
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    // HEALTH_SCORE 추출 (0점 방지)
-    let matchRate = 0;
-    const scoreMatch = text.match(/(?:HEALTH_SCORE|점수)[:\s]*(\d+)/i);
+    // 🚨 [핵심 수정] % 단위를 포함한 숫자 추출 로직 강화
+    let matchRate = 20; // 최소 점수 20점 기본값 설정
+    const scoreMatch = text.match(/HEALTH_SCORE[:\s]*(\d+)/i);
     if (scoreMatch) {
       matchRate = parseInt(scoreMatch[1]);
-      text = text.replace(/(?:HEALTH_SCORE|점수)[:\s]*\d+/gi, "").trim();
+      // % 기호가 본문에 남아있지 않도록 정규표현식으로 줄 전체 삭제
+      text = text.replace(/HEALTH_SCORE[:\s]*\d+[%]?/gi, "").trim();
     }
+    
+    // 점수 범위 강제 (20~100)
+    matchRate = Math.max(20, Math.min(100, matchRate));
 
     return jsonResponse({ ok: true, text, matchRate });
   } catch (e: any) {
