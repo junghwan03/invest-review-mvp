@@ -11,13 +11,12 @@ import {
   ASSET_LABEL,
   TAB_LABEL,
   NOTE_TEMPLATES,
-  EXAMPLE_NOTES,
   BOARDING_TITLE,
   BOARDING_BULLETS,
 } from "./constants";
 
 // =========================================================
-// 🎨 UI 컴포넌트: 토스 심사 통과용 모달 (Alert & Prompt 대체)
+// 🎨 UI 컴포넌트: 토스 심사 통과용 모달
 // =========================================================
 
 function AlertModal({
@@ -132,22 +131,13 @@ function InputModal({
 }
 
 // =========================================================
-// 🧠 비즈니스 로직 (원본 로직 유지)
+// 🧠 비즈니스 로직
 // =========================================================
 
-function getApiUrl(path: string) {
-  const VERCEL_URL = "https://invest-review-mvp.vercel.app";
-  const origin = typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_API_ORIGIN ?? VERCEL_URL) : VERCEL_URL;
-  const clean = origin.replace(/\/$/, "");
-  return `${clean}${path}`;
-}
+// ✅ [수정] getApiUrl 함수 제거 (혼란 방지 및 상대 경로 강제 사용)
 
 function clampTicker(v: string) {
   return v.replace(/[^\p{L}\p{N}\s.\-_]/gu, "").trim().slice(0, 40);
-}
-
-function escapeHtml(s: string) {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
 const HISTORY_KEY = "invest_review_history_v2";
@@ -166,11 +156,6 @@ function formatDateTime(ts: number) {
   const day = String(d.getDate()).padStart(2, "0"); const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${y}-${m}-${day} ${hh}:${mm}`;
-}
-
-function short(s: string, n = 80) {
-  const t = (s ?? "").replace(/\s+/g, " ").trim();
-  return t.length > n ? t.slice(0, n) + "…" : t;
 }
 
 function buildExportText(h: HistoryItem) {
@@ -510,7 +495,7 @@ export default function Page() {
     setResult("AI가 리포트를 작성 중입니다...");
 
     try {
-      // ✅ 통합된 백엔드 상대 경로 사용
+      // ✅ [중요] 상대 경로 사용 (빌드 에러 및 CORS 방지)
       const res = await fetch("/api/ai/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

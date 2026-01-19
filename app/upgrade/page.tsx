@@ -152,6 +152,7 @@ export default function UpgradePage() {
       const base64Full = reader.result as string;
       setPreviewUrl(base64Full);
       try {
+        // ✅ [수정] 상대 경로 명시적 사용
         const res = await fetch("/api/ai/upgrade", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "vision", imageBase64: base64Full.split(",")[1] }),
@@ -162,12 +163,15 @@ export default function UpgradePage() {
 
         const rawContent = data.text || data.content || "";
         
-        // 🔥 [절대 세척] 중괄호 {} 사이의 가장 큰 덩어리만 골라냄
+        // 🔥 [절대 세척] 중괄호 {} 사이의 가장 큰 덩어리만 골라냄 (파싱 에러 방지 핵심)
         const match = rawContent.match(/\{[\s\S]*\}/);
         if (!match) throw new Error("유효한 데이터를 찾을 수 없습니다.");
         
         const jsonStr = match[0];
-        const parsed = JSON.parse(jsonStr);
+        
+        // ✅ [추가] 혹시 모를 제어 문자 제거
+        const cleanJsonStr = jsonStr.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+        const parsed = JSON.parse(cleanJsonStr);
         
         const item = parsed.extracted?.[0];
         if (item) {
@@ -189,7 +193,6 @@ export default function UpgradePage() {
       } catch (err) { 
         console.error("Vision Error:", err);
         setUploadStatus("❌ 인식 실패 (직접 입력 권장)");
-        // 💡 에러 메시지는 띄우되 화면이 멈추지 않도록 처리
       } finally { 
         setVisionLoading(false); 
       }
@@ -214,6 +217,7 @@ export default function UpgradePage() {
         ? { ticker: ticker.trim().toUpperCase(), manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } 
         : { type: "comparison", portfolio, expertId: selectedExpert };
       
+      // ✅ [수정] 상대 경로 명시적 사용
       const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
 

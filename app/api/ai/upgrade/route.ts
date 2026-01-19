@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
-// ✅ [수정] output: export 설정과 충돌하지 않도록 설정을 제거하거나 
-// 빌드 시점에 에러가 발생한다면 이 줄을 완전히 삭제하는 것이 가장 좋습니다.
-// 우선 토스 정적 빌드 규칙에 맞춰 아래 설정을 유지하되, 에러 발생 시 삭제하세요.
-export const dynamic = "force-static"; 
+// ✅ [중요] API는 사용자 요청을 받아야 하므로 무조건 동적(dynamic)이어야 합니다.
+// static으로 하면 빌드 시점에 굳어져서 기능이 작동하지 않습니다.
+export const dynamic = "force-dynamic";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,7 +22,7 @@ function normalizeTradeType(v: any): TradeType {
   return "long";
 }
 
-// ✅ [노선 1] 매매 복기 지시문 (원본 100% 유지)
+// ✅ [노선 1] 매매 복기 지시문
 function getInstruction(tradeType: TradeType) {
   const commonRules = `
 너는 "투자/트레이딩 복기 코치"다. 출력은 반드시 한국어.
@@ -60,7 +59,7 @@ function getInstruction(tradeType: TradeType) {
   return etfGuide;
 }
 
-// ✅ [노선 2] 고수 비교 지시문 (원본 100% 유지)
+// ✅ [노선 2] 고수 비교 지시문
 function getDiagnosisInstruction(expertId: string) {
   const expertData: Record<string, string> = {
     warren_buffett: "정보기술/금융/소비재 중심의 가치투자 및 해자 기업",
@@ -83,7 +82,7 @@ function getDiagnosisInstruction(expertId: string) {
   [필수] 답변 맨 마지막 줄에만 'HEALTH_SCORE: [숫자]' 형식으로 일치율을 적어라. 본문에는 HEALTH_SCORE라는 단어를 절대 쓰지 마라.`;
 }
 
-// ✅ [노선 3] 심층 지표 분석 지시문 (원본 유지)
+// ✅ [노선 3] 심층 지표 분석 지시문
 function getAnalysisInstruction() {
   return `너는 '지표 분석 애널리스트'다. 지정된 형식을 엄수하라. ## 🌐 산업 사이클 분석... ## 📊 지표별 상세 판단... ## ⚖️ 종합 판단...`; 
 }
@@ -133,9 +132,14 @@ export async function POST(req: Request) {
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    // ✅ [강화] JSON 세척 로직 (The string did not match 에러 방지용)
-    // 마크다운 기호뿐만 아니라 앞뒤 공백과 줄바꿈을 완벽히 제거합니다.
-    text = text.replace(/```json|```/g, "").trim();
+    // ✅ [핵심 수정] "The string did not match" 에러 방지용 강력한 세척 로직
+    // AI가 앞뒤에 잡다한 말을 붙여도 { ... } JSON 덩어리만 강제로 추출합니다.
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      text = jsonMatch[0];
+    } else {
+      text = text.replace(/```json|```/g, "").trim();
+    }
 
     let matchRate = 20; 
     const scoreMatch = text.match(/HEALTH_SCORE[:\s\*]*(\d+)/i);

@@ -1,15 +1,17 @@
 import type { NextConfig } from "next";
 
-const nextConfig: any = { // ✅ 타입을 any로 바꾸면 빨간줄이 바로 사라집니다.
-  // 토스 빌드 시에는 아래 두 줄을 활성화하고, Vercel 배포 시에는 주석 처리하세요.
-  output: "export", 
-  distDir: ".next/web", 
+const nextConfig: any = { 
+  // 1️⃣ [토스 빌드용] 토스에 업로드할 때만 아래 주석(//)을 푸세요.
+  // output: "export", 
+  // distDir: ".next/web", 
   
+  // 2️⃣ [Vercel 배포용] Vercel에 올릴 때는 위 두 줄을 반드시 주석 처리해야 API가 작동합니다.
+
   images: {
     unoptimized: true,
   },
   
-  // ✅ 빌드 도중 API 경로 에러나 린트 에러로 멈추는 것을 방지
+  // ✅ 빌드 에러 방지 (아주 잘하셨습니다)
   eslint: {
     ignoreDuringBuilds: true,
   },
