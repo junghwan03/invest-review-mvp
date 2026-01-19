@@ -31,6 +31,9 @@ const USAGE_KEY = "daily_usage_analysis_v1";
 const FREE_HISTORY_LIMIT = 10;
 const DAILY_LIMIT = 3; 
 
+// 🔥 [중요] Vercel 배포 주소 (이게 있어야 토스 앱에서 서버를 찾습니다)
+const API_BASE_URL = "https://invest-review-mvp.vercel.app";
+
 function formatDateTime(ts: number) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -155,7 +158,8 @@ export default function UpgradePage() {
       const base64Full = reader.result as string;
       setPreviewUrl(base64Full);
       try {
-        const res = await fetch("/api/ai/upgrade", {
+        // ✅ [수정됨] Vercel 절대 주소로 호출
+        const res = await fetch(`${API_BASE_URL}/api/ai/upgrade`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "vision", imageBase64: base64Full.split(",")[1] }),
         });
@@ -218,7 +222,8 @@ export default function UpgradePage() {
         ? { ticker: ticker.trim().toUpperCase(), manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } 
         : { type: "comparison", portfolio, expertId: selectedExpert };
       
-      const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      // ✅ [수정됨] Vercel 절대 주소로 호출
+      const res = await fetch(`${API_BASE_URL}/api/ai/upgrade`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
 
       if (!res.ok || !data.ok) throw new Error(data.text || "분석 실패");

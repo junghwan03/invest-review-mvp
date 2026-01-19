@@ -15,6 +15,9 @@ import {
   BOARDING_BULLETS,
 } from "./constants";
 
+// 🔥 [중요] Vercel 배포 주소 (토스 앱 연결용)
+const API_BASE_URL = "https://invest-review-mvp.vercel.app";
+
 // =========================================================
 // 🎨 UI 컴포넌트: 토스 심사 통과용 모달
 // =========================================================
@@ -133,8 +136,6 @@ function InputModal({
 // =========================================================
 // 🧠 비즈니스 로직
 // =========================================================
-
-// ✅ [수정] getApiUrl 함수 제거 (혼란 방지 및 상대 경로 강제 사용)
 
 function clampTicker(v: string) {
   return v.replace(/[^\p{L}\p{N}\s.\-_]/gu, "").trim().slice(0, 40);
@@ -495,8 +496,8 @@ export default function Page() {
     setResult("AI가 리포트를 작성 중입니다...");
 
     try {
-      // ✅ [중요] 상대 경로 사용 (빌드 에러 및 CORS 방지)
-      const res = await fetch("/api/ai/upgrade", {
+      // ✅ [수정됨] Vercel 절대 주소로 호출
+      const res = await fetch(`${API_BASE_URL}/api/ai/upgrade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ticker, entryPrice, stopLoss: stopLoss === "" ? null : stopLoss, reasonNote: buildReasonForAI(), tradeType }),
