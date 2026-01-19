@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-// ✅ [중요] API는 사용자 요청을 받아야 하므로 무조건 동적(dynamic)이어야 합니다.
-// static으로 하면 빌드 시점에 굳어져서 기능이 작동하지 않습니다.
+// ✅ [Vercel 배포용] Vercel 배포 시 필수 (토스 빌드 땐 // 주석 처리)
 export const dynamic = "force-dynamic";
 
 const corsHeaders = {
@@ -96,12 +95,36 @@ export async function POST(req: Request) {
     let systemPrompt = "";
     let userPrompt: any = "";
 
+    // 🔥 [수정됨] 테슬라 같은 스크린샷 인식을 위한 강력한 영어 프롬프트
     if (body.type === "vision" && body.imageBase64) {
-      systemPrompt = `너는 증권사 MTS/HTS 앱 스크린샷 판독 전문가다. 이미지에서 주식 지표를 정밀하게 추출하라.
-      [추출 가이드] 1. PER, PBR, ROE, PSR, ticker, weight 추출. 2. 오직 JSON만 출력. 3. 숫자에 단위 제외. 4. 없으면 "N/A"`;
+      systemPrompt = `You are a strict Data Extraction AI. 
+      Analyze the stock app screenshot provided.
+      Extract ONLY the following numbers. Do not explain. Do not calculate.
+      
+      Required Fields:
+      - ticker (e.g., TSLA, AAPL, or Korean Name)
+      - per (Price Earnings Ratio)
+      - pbr (Price Book Value Ratio)
+      - roe (Return on Equity)
+      - psr (Price Sales Ratio)
+      - weight (Portfolio weight in %, if visible. otherwise "N/A")
+
+      Output Format (JSON ONLY):
+      {
+        "extracted": [
+          {
+            "ticker": "string",
+            "per": "number or string",
+            "pbr": "number or string",
+            "roe": "number or string",
+            "psr": "number or string",
+            "weight": "number or string"
+          }
+        ]
+      }`;
       
       userPrompt = [
-        { type: "text", text: "이 이미지에서 주식 지표 데이터를 추출해서 JSON으로만 응답해라." },
+        { type: "text", text: "Extract stock data from this image. Output valid JSON only." },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.imageBase64}` } }
       ];
     } 
@@ -124,16 +147,17 @@ export async function POST(req: Request) {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0,
+        temperature: 0, // 0으로 설정해야 창의성 없이 팩트만 인식함
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+        // 🔥 Vision 모드일 때 JSON 강제 출력 옵션 활성화
+        response_format: body.type === "vision" ? { type: "json_object" } : undefined 
       }),
     });
 
     const data = await res.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    // ✅ [핵심 수정] "The string did not match" 에러 방지용 강력한 세척 로직
-    // AI가 앞뒤에 잡다한 말을 붙여도 { ... } JSON 덩어리만 강제로 추출합니다.
+    // ✅ [2중 안전장치] JSON 추출 및 정제
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       text = jsonMatch[0];
