@@ -146,9 +146,8 @@ export default function UpgradePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // ✅ 수정 1: 시작 시 메시지 설정
     setVisionLoading(true); 
-    setUploadStatus("AI 분석 중...");
+    setUploadStatus("AI 분석 중..."); // 🔵 파란색
     
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -166,16 +165,16 @@ export default function UpgradePage() {
 
         const rawContent = data.text || data.content || "";
         const match = rawContent.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error("유효한 데이터를 찾을 수 없습니다.");
+        
+        if (!match) throw new Error("데이터 없음");
         
         const jsonStr = match[0];
-        const parsed = JSON.parse(jsonStr);
+        const cleanJsonStr = jsonStr.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+        const parsed = JSON.parse(cleanJsonStr);
         
         const item = parsed.extracted?.[0];
         if (item) {
-          // ✅ 수정 2: 성공 메시지 변경
-          setUploadStatus("성공!");
-          
+          setUploadStatus("성공! 자동 입력 완료"); // 🔵 파란색
           if (item.weight && item.weight !== "N/A" && item.weight !== "") {
             setMode("portfolio"); 
             setPortfolio((prev) => [...prev, { ticker: String(item.ticker).toUpperCase(), weight: Number(item.weight) }]);
@@ -189,11 +188,12 @@ export default function UpgradePage() {
               psr: item.psr && item.psr !== "N/A" ? String(item.psr) : "" 
             });
           }
+        } else {
+            throw new Error("데이터 추출 실패");
         }
       } catch (err) { 
         console.error("Vision Error:", err);
-        // ✅ 수정 3: 실패 메시지 변경
-        setUploadStatus("인식 실패했습니다. 수동입력해 주세요");
+        setUploadStatus("인식 실패했습니다. 수동입력해 주세요"); // 🔴 빨간색
       } finally { 
         setVisionLoading(false); 
       }
@@ -275,14 +275,12 @@ export default function UpgradePage() {
           )}
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} />
         </label>
-        
-        {/* ✅ 수정 4: 메시지에 따른 색상 조건 변경 (파란색: 분석중/성공, 빨간색: 실패) */}
         {uploadStatus && (
           <div style={{ 
             marginTop: 8, 
             fontSize: 12, 
             fontWeight: 700, 
-            color: (uploadStatus === "AI 분석 중..." || uploadStatus === "성공!") ? "#2563eb" : "#ef4444" 
+            color: (uploadStatus.includes("AI 분석 중") || uploadStatus.includes("성공")) ? "#2563eb" : "#ef4444" 
           }}>
             {uploadStatus}
           </div>
