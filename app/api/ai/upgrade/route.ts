@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-// ✅ [Vercel 배포용] Vercel 배포 시 필수 (토스 빌드 땐 // 주석 처리)
+// ✅ [Vercel/Github 배포용] 이 줄이 반드시 활성화되어 있어야 서버가 작동합니다!
+// (토스 빌드할 때만 다시 주석 처리하세요)
 export const dynamic = "force-dynamic";
 
 const corsHeaders = {
