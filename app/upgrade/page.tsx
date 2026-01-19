@@ -145,14 +145,17 @@ export default function UpgradePage() {
   const handleVisionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setVisionLoading(true); setUploadStatus("AI 분석 중...");
+    
+    // ✅ 수정 1: 시작 시 메시지 설정
+    setVisionLoading(true); 
+    setUploadStatus("AI 분석 중...");
+    
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
       const base64Full = reader.result as string;
       setPreviewUrl(base64Full);
       try {
-        // ✅ [수정] 상대 경로 명시적 사용
         const res = await fetch("/api/ai/upgrade", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "vision", imageBase64: base64Full.split(",")[1] }),
@@ -162,20 +165,17 @@ export default function UpgradePage() {
         if (!res.ok || !data.ok) throw new Error("인식 실패");
 
         const rawContent = data.text || data.content || "";
-        
-        // 🔥 [절대 세척] 중괄호 {} 사이의 가장 큰 덩어리만 골라냄 (파싱 에러 방지 핵심)
         const match = rawContent.match(/\{[\s\S]*\}/);
         if (!match) throw new Error("유효한 데이터를 찾을 수 없습니다.");
         
         const jsonStr = match[0];
-        
-        // ✅ [추가] 혹시 모를 제어 문자 제거
-        const cleanJsonStr = jsonStr.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
-        const parsed = JSON.parse(cleanJsonStr);
+        const parsed = JSON.parse(jsonStr);
         
         const item = parsed.extracted?.[0];
         if (item) {
-          setUploadStatus("✅ 자동 입력 완료!");
+          // ✅ 수정 2: 성공 메시지 변경
+          setUploadStatus("성공!");
+          
           if (item.weight && item.weight !== "N/A" && item.weight !== "") {
             setMode("portfolio"); 
             setPortfolio((prev) => [...prev, { ticker: String(item.ticker).toUpperCase(), weight: Number(item.weight) }]);
@@ -192,7 +192,8 @@ export default function UpgradePage() {
         }
       } catch (err) { 
         console.error("Vision Error:", err);
-        setUploadStatus("❌ 인식 실패 (직접 입력 권장)");
+        // ✅ 수정 3: 실패 메시지 변경
+        setUploadStatus("인식 실패했습니다. 수동입력해 주세요");
       } finally { 
         setVisionLoading(false); 
       }
@@ -217,7 +218,6 @@ export default function UpgradePage() {
         ? { ticker: ticker.trim().toUpperCase(), manualPer: manualData.per, manualRoe: manualData.roe, manualPbr: manualData.pbr, manualPsr: manualData.psr } 
         : { type: "comparison", portfolio, expertId: selectedExpert };
       
-      // ✅ [수정] 상대 경로 명시적 사용
       const res = await fetch("/api/ai/upgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
 
@@ -275,7 +275,18 @@ export default function UpgradePage() {
           )}
           <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleVisionUpload} />
         </label>
-        {uploadStatus && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: uploadStatus.includes("✅") ? "#059669" : "#ef4444" }}>{uploadStatus}</div>}
+        
+        {/* ✅ 수정 4: 메시지에 따른 색상 조건 변경 (파란색: 분석중/성공, 빨간색: 실패) */}
+        {uploadStatus && (
+          <div style={{ 
+            marginTop: 8, 
+            fontSize: 12, 
+            fontWeight: 700, 
+            color: (uploadStatus === "AI 분석 중..." || uploadStatus === "성공!") ? "#2563eb" : "#ef4444" 
+          }}>
+            {uploadStatus}
+          </div>
+        )}
       </section>
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["single", "portfolio"].map((m) => (
